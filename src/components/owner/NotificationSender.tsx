@@ -2,249 +2,228 @@
 
 import { useState } from 'react';
 import { useStore } from '@/store/useStore';
+import { Send, Tag, Sparkles, Megaphone, Clock, CheckCircle2, X } from 'lucide-react';
+import PremiumButton from '@/components/ui/PremiumButton';
 
 type NotifType = 'new_product' | 'offer' | 'open_now' | 'general';
 
 interface Template {
   type: NotifType;
-  icon: string;
+  icon: any;
   label: string;
   defaultTitle: string;
   defaultBody: string;
-  color: string;
-  bgColor: string;
 }
 
 const TEMPLATES: Template[] = [
   {
     type: 'new_product',
-    icon: 'box',
-    label: 'New Product',
-    defaultTitle: '🆕 Naya Product Aaya!',
-    defaultBody: 'Aaj ka fresh batch ready hai — jaldi aao!',
-    color: 'text-blue-700',
-    bgColor: 'bg-blue-50 border-blue-200',
+    icon: Sparkles,
+    label: 'New Product Drop',
+    defaultTitle: 'Fresh Batch Arrived Today!',
+    defaultBody: 'Our handcrafted specialty items are freshly prepared and ready for tasting.',
   },
   {
     type: 'offer',
-    icon: 'tag',
-    label: 'Special Offer',
-    defaultTitle: '🏷️ Special Offer — Limited Time!',
-    defaultBody: 'Aaj sirf — 20% off on all sweets!',
-    color: 'text-orange-700',
-    bgColor: 'bg-orange-50 border-orange-200',
+    icon: Tag,
+    label: 'Festive Offer',
+    defaultTitle: 'Exclusive Heritage Discount • Limited Time',
+    defaultBody: 'Enjoy up to 20% off on all signature festive gift boxes this week.',
   },
   {
     type: 'open_now',
-    icon: 'door-open',
-    label: 'Shop Open',
-    defaultTitle: '🏪 Dukan Khul Gayi!',
-    defaultBody: 'Aaj fresh maal aaya hai. Aao jaldi!',
-    color: 'text-green-700',
-    bgColor: 'bg-green-50 border-green-200',
+    icon: Clock,
+    label: 'Store Open Alert',
+    defaultTitle: 'Our Heritage Doors are Open!',
+    defaultBody: 'Visit our traditional bazaar workshop today for fresh preparations.',
   },
   {
     type: 'general',
-    icon: 'bullhorn',
-    label: 'Announcement',
-    defaultTitle: '📢 Important Update',
-    defaultBody: 'Kuch khaas baat hai aaj...',
-    color: 'text-purple-700',
-    bgColor: 'bg-purple-50 border-purple-200',
+    icon: Megaphone,
+    label: 'Store Broadcast',
+    defaultTitle: 'Heritage Announcement',
+    defaultBody: 'Special updates and seasonal preparations from our store.',
   },
 ];
 
-export default function NotificationSender() {
-  const { ownerShopId, showToast } = useStore();
+interface NotificationSenderProps {
+  shopId?: string;
+  shopName?: string;
+  onClose?: () => void;
+}
+
+export default function NotificationSender({
+  shopId: propShopId,
+  shopName: propShopName,
+  onClose,
+}: NotificationSenderProps) {
+  const { ownerShopId, ownerShopName, showToast } = useStore();
+  const activeShopId = propShopId || ownerShopId;
+  const activeShopName = propShopName || ownerShopName;
 
   const [selectedType, setSelectedType] = useState<NotifType>('new_product');
-  const [title, setTitle]   = useState('');
-  const [body, setBody]     = useState('');
-  const [url, setUrl]       = useState('');
+  const [title, setTitle] = useState(TEMPLATES[0].defaultTitle);
+  const [body, setBody] = useState(TEMPLATES[0].defaultBody);
   const [sending, setSending] = useState(false);
-  const [lastResult, setLastResult] = useState<{ sent: number; failed: number } | null>(null);
+  const [sentCount, setSentCount] = useState<number | null>(null);
 
-  const template = TEMPLATES.find(t => t.type === selectedType)!;
-
-  const handleTypeSelect = (type: NotifType) => {
-    setSelectedType(type);
-    const t = TEMPLATES.find(x => x.type === type)!;
-    if (!title) setTitle(t.defaultTitle);
-    if (!body)  setBody(t.defaultBody);
+  const handleSelectType = (tpl: Template) => {
+    setSelectedType(tpl.type);
+    setTitle(tpl.defaultTitle);
+    setBody(tpl.defaultBody);
   };
 
   const handleSend = async () => {
-    const finalTitle = title.trim() || template.defaultTitle;
-    const finalBody  = body.trim()  || template.defaultBody;
-
-    if (!finalTitle || !finalBody) {
-      showToast('Title aur message dono bharo');
+    if (!title.trim() || !body.trim()) {
+      showToast('Title and description are required');
       return;
     }
 
     setSending(true);
-    setLastResult(null);
-
     try {
       const res = await fetch('/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          secret: process.env.NEXT_PUBLIC_NOTIFY_SECRET || 'purani-dukan-secret',
-          shopId: ownerShopId,
-          payload: {
-            title: finalTitle,
-            body: finalBody,
-            type: selectedType,
-            url: url || `/explorer?shop=${ownerShopId}`,
-            shopId: ownerShopId,
-          },
+          shopId: activeShopId,
+          shopName: activeShopName,
+          type: selectedType,
+          title: title.trim(),
+          body: body.trim(),
+          url: `/explorer/shop/${activeShopId}`,
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to send notification');
 
-      if (data.success) {
-        setLastResult({ sent: data.sent, failed: data.failed || 0 });
-        showToast(`Notification bheja! ${data.sent} logon tak pahuncha`);
-        setTitle('');
-        setBody('');
-        setUrl('');
-      } else {
-        showToast('Bhejne mein dikkat ayi');
+      setSentCount(data.sent ?? 1);
+      showToast('Broadcast sent to all followers!');
+      if (onClose) {
+        setTimeout(() => onClose(), 1200);
       }
-    } catch {
-      showToast('Network error — try again');
+    } catch (err: any) {
+      showToast(err.message || 'Notification failed');
     } finally {
       setSending(false);
     }
   };
 
-  return (
-    <div className="max-w-xl">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 bg-[#8d5524]/10 rounded-2xl flex items-center justify-center">
-          <i className="fas fa-bell text-[#8d5524]" />
-        </div>
+  const modalContainer = (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-black text-lg text-gray-800">Send Notification</h3>
-          <p className="text-xs text-gray-400">Apne followers ko directly notify karo</p>
+          <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#C9A96E]">
+            REAL-TIME BROADCAST
+          </span>
+          <h3 className="font-serif font-bold text-xl text-[#F5F5F5] mt-0.5">
+            Notify Followers & Explorers
+          </h3>
         </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-[#1C1C1C] flex items-center justify-center text-[#71717A] hover:text-[#F5F5F5]"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
-      {/* Type selector */}
-      <div className="grid grid-cols-2 gap-2 mb-5">
-        {TEMPLATES.map(t => (
-          <button
-            key={t.type}
-            onClick={() => handleTypeSelect(t.type)}
-            className={`flex items-center gap-2.5 p-3 rounded-2xl border-2 text-left transition-all ${
-              selectedType === t.type
-                ? `${t.bgColor} border-current ${t.color}`
-                : 'bg-gray-50 border-transparent text-gray-600 hover:border-gray-200'
-            }`}
-          >
-            <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-              selectedType === t.type ? 'bg-white/60' : 'bg-white border border-gray-100'
-            }`}>
-              <i className={`fas fa-${t.icon} text-sm`} />
-            </div>
-            <span className="font-bold text-sm">{t.label}</span>
-          </button>
-        ))}
+      {/* Templates */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {TEMPLATES.map((tpl) => {
+          const Icon = tpl.icon;
+          const isSelected = selectedType === tpl.type;
+          return (
+            <button
+              key={tpl.type}
+              type="button"
+              onClick={() => handleSelectType(tpl)}
+              className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                isSelected
+                  ? 'bg-[#C9A96E]/15 border-[#C9A96E] text-[#C9A96E]'
+                  : 'bg-[#181818] border-white/5 text-[#A1A1AA] hover:bg-[#202020]'
+              }`}
+            >
+              <Icon className="w-4 h-4 mb-2" />
+              <p className="text-xs font-bold">{tpl.label}</p>
+            </button>
+          );
+        })}
       </div>
 
       {/* Title */}
-      <div className="mb-4">
-        <label className="text-sm font-bold text-gray-600 block mb-1.5">
-          Title <span className="text-gray-400 font-normal">(Max 50 chars)</span>
+      <div>
+        <label className="block text-[10px] font-mono uppercase text-[#71717A] mb-1 font-bold">
+          Notification Title
         </label>
         <input
           type="text"
           value={title}
-          onChange={e => setTitle(e.target.value.slice(0, 50))}
-          placeholder={template.defaultTitle}
-          className="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:border-[#8d5524] text-sm transition-colors"
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full px-4 py-2.5 rounded-xl bg-[#181818] border border-white/10 text-xs text-[#F5F5F5] placeholder-[#52525B] outline-none focus:border-[#C9A96E]"
         />
-        <div className="text-right text-[10px] text-gray-400 mt-1">{title.length}/50</div>
       </div>
 
       {/* Body */}
-      <div className="mb-4">
-        <label className="text-sm font-bold text-gray-600 block mb-1.5">
-          Message <span className="text-gray-400 font-normal">(Max 120 chars)</span>
+      <div>
+        <label className="block text-[10px] font-mono uppercase text-[#71717A] mb-1 font-bold">
+          Notification Message
         </label>
         <textarea
-          value={body}
-          onChange={e => setBody(e.target.value.slice(0, 120))}
-          placeholder={template.defaultBody}
           rows={3}
-          className="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:border-[#8d5524] text-sm resize-none transition-colors"
-        />
-        <div className="text-right text-[10px] text-gray-400">{body.length}/120</div>
-      </div>
-
-      {/* URL (optional) */}
-      <div className="mb-6">
-        <label className="text-sm font-bold text-gray-600 block mb-1.5">
-          Link <span className="text-gray-400 font-normal">(optional — notification tap karne par kahan jaye)</span>
-        </label>
-        <input
-          type="text"
-          value={url}
-          onChange={e => setUrl(e.target.value)}
-          placeholder={`/explorer?shop=${ownerShopId}`}
-          className="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:border-[#8d5524] text-sm transition-colors"
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          className="w-full px-4 py-2.5 rounded-xl bg-[#181818] border border-white/10 text-xs text-[#F5F5F5] placeholder-[#52525B] outline-none focus:border-[#C9A96E] resize-none leading-relaxed"
         />
       </div>
 
-      {/* Preview */}
-      <div className="bg-gray-900 rounded-2xl p-4 mb-5">
-        <p className="text-[10px] text-gray-500 mb-2 uppercase tracking-wide">Preview</p>
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#8d5524] flex items-center justify-center flex-shrink-0">
-            <i className="fas fa-store text-white text-sm" />
-          </div>
-          <div>
-            <p className="font-bold text-sm text-white leading-tight">
-              {title || template.defaultTitle}
-            </p>
-            <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
-              {body || template.defaultBody}
-            </p>
-            <p className="text-[10px] text-gray-600 mt-1">Purani Dukan • now</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Last result */}
-      {lastResult && (
-        <div className="flex items-center gap-2 mb-4 bg-green-50 border border-green-200 rounded-2xl p-3">
-          <i className="fas fa-check-circle text-green-500" />
-          <p className="text-sm text-green-700 font-bold">
-            {lastResult.sent} followers tak pahuncha
-            {lastResult.failed > 0 && `, ${lastResult.failed} fail`}
-          </p>
+      {sentCount !== null && (
+        <div className="p-3 rounded-xl bg-[#22c55e]/15 border border-[#22c55e]/30 text-xs text-[#22c55e] flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span>Broadcast successfully delivered to local explorer devices.</span>
         </div>
       )}
 
-      {/* Send button */}
-      <button
-        onClick={handleSend}
-        disabled={sending}
-        className="w-full py-4 rounded-2xl font-black text-lg text-white disabled:opacity-50 flex items-center justify-center gap-3 transition-all hover:-translate-y-0.5 active:scale-98"
-        style={{ background: 'linear-gradient(135deg, #8d5524, #b87333)' }}
-      >
-        {sending ? (
-          <><i className="fas fa-spinner fa-spin" /> Bhej raha hoon...</>
-        ) : (
-          <><i className="fas fa-paper-plane" /> Notification Bhejo</>
+      {/* Submit */}
+      <div className="flex gap-3 pt-2">
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-3 rounded-xl border border-white/10 text-xs font-bold text-[#A1A1AA] hover:bg-white/5"
+          >
+            Cancel
+          </button>
         )}
-      </button>
-
-      <p className="text-center text-xs text-gray-400 mt-3">
-        Sirf un logon ko milega jinhone aapki shop follow ki hai
-      </p>
+        <PremiumButton
+          variant="gold"
+          size="md"
+          onClick={handleSend}
+          disabled={sending}
+          icon={Send}
+          className={onClose ? 'flex-1' : 'w-full'}
+          magnetic
+        >
+          {sending ? 'Broadcasting...' : 'Send Live Notification'}
+        </PremiumButton>
+      </div>
     </div>
   );
+
+  if (onClose) {
+    return (
+      <div
+        className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+        onClick={(e) => e.target === e.currentTarget && onClose()}
+      >
+        <div className="w-full max-w-lg rounded-3xl bg-[#121212] border border-white/10 p-6 sm:p-8 shadow-2xl animate-scale-in">
+          {modalContainer}
+        </div>
+      </div>
+    );
+  }
+
+  return modalContainer;
 }

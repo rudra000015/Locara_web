@@ -1,88 +1,89 @@
 'use client';
 
-import { usePathname, useRouter } from 'next/navigation';
-import { useStore, type OwnerPage } from '@/store/useStore';
-import { useT } from '@/i18n/useT';
-import LanguageToggle from '@/components/ui/LanguageToggle';
-import type { TranslationKey } from '@/i18n/translations';
+import { useStore } from '@/store/useStore';
+import { useRouter } from 'next/navigation';
+import { Store, Compass, LogOut, Sparkles } from 'lucide-react';
+import PremiumButton from '@/components/ui/PremiumButton';
 
-interface Props {
-  shopName: string;
-}
-
-const OWNER_NAVS: { key: OwnerPage; labelKey: TranslationKey; icon: string }[] = [
-  { key: 'showcase', labelKey: 'owner_showcase', icon: 'th-large' },
-  { key: 'collections', labelKey: 'owner_collections', icon: 'layer-group' },
-  { key: 'addproduct', labelKey: 'owner_add_product', icon: 'plus-circle' },
-  { key: 'profile', labelKey: 'owner_shop_profile', icon: 'id-card' },
-  { key: 'analytics', labelKey: 'owner_analytics', icon: 'chart-line' },
-];
-
-export default function OwnerHeader({ shopName }: Props) {
-  const pathname = usePathname();
-  const { logout, theme, setTheme } = useStore();
+export default function OwnerHeader({ shopName }: { shopName: string }) {
   const router = useRouter();
-  const t = useT();
-
-  const handleLogout = () => {
-    logout();
-    router.push('/');
-  };
+  const { user, logout, navTo, ownerPage, ownerNavTo } = useStore();
 
   return (
-    <header
-      style={{ background: 'linear-gradient(135deg, #1a0f0a, #2c1810)' }}
-      className="text-white px-6 py-4 flex items-center justify-between shadow-lg z-40 flex-shrink-0"
-    >
-      <div className="flex items-center gap-3">
-        <div className="w-11 h-11 bg-[#b87333]/30 rounded-xl flex items-center justify-center text-white text-xl">
-          <i className="fas fa-store" />
+    <header className="sticky top-0 z-40 bg-[#0E0B08]/92 backdrop-blur-2xl border-b border-[#F6EAD7]/10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+        {/* Brand & Store Name */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-2xl bg-[#1E5544]/30 border border-[#1E5544]/60 flex items-center justify-center text-[#2D7D64] shrink-0 shadow-glow-emerald">
+            <Store className="w-5 h-5 text-[#2D7D64]" />
+          </div>
+          <div className="min-w-0">
+            <p className="font-serif text-base font-bold text-[#F6EAD7] truncate leading-tight">
+              {shopName}
+            </p>
+            <p className="text-[9px] font-mono uppercase tracking-widest text-[#E0AF62]">
+              MERCHANT CONSOLE • LOCARA
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="font-bold text-lg leading-none">{t('owner_dashboard')}</h1>
-          <p className="text-[10px] text-[#d2b48c] uppercase tracking-widest">{shopName}</p>
-        </div>
-      </div>
 
-      <nav className="hidden md:flex gap-6 text-sm font-medium text-[#d2b48c]">
-        {OWNER_NAVS.map(({ key, labelKey }) => (
+        {/* Desktop Nav Tabs */}
+        <nav className="hidden md:flex items-center gap-1 bg-[#17120E] p-1 rounded-2xl border border-[#F6EAD7]/10">
+          {(
+            [
+              { id: 'showcase', label: 'Dashboard' },
+              { id: 'reservations', label: 'Reservations' },
+              { id: 'addproduct', label: 'Products' },
+              { id: 'collections', label: 'Collections' },
+              { id: 'analytics', label: 'Analytics' },
+              { id: 'profile', label: 'Profile' },
+            ] as const
+          ).map((tab) => {
+            const isActive = ownerPage === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => ownerNavTo(tab.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-[#211A14] text-[#E0AF62] shadow-sm'
+                    : 'text-[#9E8B75] hover:text-[#F6EAD7]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2.5 shrink-0">
           <button
-            key={key}
             type="button"
-            onClick={() => router.push(key === 'showcase' ? '/owner' : `/owner/${key}`)}
-            className={`hover:text-white border-b-2 pb-1 transition-all ${
-              (key === 'showcase' ? pathname === '/owner' : pathname.startsWith(`/owner/${key}`))
-                ? 'text-white border-[#b87333]'
-                : 'border-transparent'
-            }`}
+            onClick={() => {
+              navTo('home');
+              router.push('/explorer');
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#17120E] hover:bg-[#211A14] border border-[#F6EAD7]/10 text-xs font-bold text-[#D8C4A7] hover:text-[#F6EAD7] transition-all cursor-pointer"
           >
-            {t(labelKey)}
+            <Compass className="w-3.5 h-3.5 text-[#C8893F]" />
+            <span className="hidden lg:inline">Explorer View</span>
           </button>
-        ))}
-      </nav>
 
-      <div className="flex items-center gap-3">
-        <LanguageToggle />
-
-        <button
-          type="button"
-          onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-          className="text-[#d2b48c] hover:text-white text-lg transition-colors"
-          aria-label="Toggle theme"
-          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        >
-          <i className={`fas fa-${theme === 'dark' ? 'sun' : 'moon'}`} />
-        </button>
-
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="text-[#d2b48c] hover:text-white text-xl transition-colors"
-          aria-label={t('owner_logout')}
-          title={t('owner_logout')}
-        >
-          <i className="fas fa-sign-out-alt" />
-        </button>
+          <button
+            type="button"
+            onClick={() => {
+              logout();
+              router.push('/');
+            }}
+            title="Sign Out"
+            className="px-3 py-2 rounded-xl bg-[#211A14] hover:bg-[#2A2119] border border-[#F6EAD7]/10 text-xs font-bold text-[#C24136] transition-all cursor-pointer flex items-center gap-1.5"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Logout</span>
+          </button>
+        </div>
       </div>
     </header>
   );

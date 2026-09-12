@@ -2,81 +2,55 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useStore } from '@/store/useStore';
-import { useT } from '@/i18n/useT';
-
-const TABS = [
-  { page: 'home', icon: 'home', labelKey: 'nav_home' },
-  { page: 'map', icon: 'map-marked-alt', labelKey: 'nav_map' },
-  { page: 'festival', icon: 'calendar-alt', labelKey: 'nav_festivals' },
-  { page: 'wishlist', icon: 'heart', labelKey: 'nav_saved' },
-  { page: 'profile', icon: 'user', labelKey: 'nav_you' },
-] as const;
+import { Compass, MapPin, CalendarCheck, ShoppingBag, User, Heart } from 'lucide-react';
 
 export default function ExplorerNav() {
   const router = useRouter();
   const pathname = usePathname();
-  const { wishlist } = useStore();
-  const t = useT();
+  const { currentPage, navTo, cart, wishlist } = useStore();
 
-  const handleNav = (page: string) => {
-    if (page === 'home') router.push('/explorer');
-    if (page === 'map') router.push('/explorer/map');
-    if (page === 'wishlist') router.push('/explorer/wishlist');
-    if (page === 'profile') router.push('/explorer/you');
-    if (page === 'festival') router.push('/festival');
-  };
+  const totalCart = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  const TABS = [
+    { id: 'home', icon: Compass, label: 'Discover' },
+    { id: 'map', icon: MapPin, label: 'Live Map' },
+    { id: 'reservations', icon: CalendarCheck, label: 'Reservations' },
+    { id: 'cart', icon: ShoppingBag, label: 'Cart' },
+    { id: 'profile', icon: User, label: 'Account' },
+  ];
 
   return (
-    <nav className="bottom-nav fixed bottom-0 left-0 w-full md:hidden z-50 safe-area-bottom">
-      <div className="mx-auto w-full max-w-md px-2 flex justify-around py-2">
-        {TABS.map(({ page, icon, labelKey }) => {
-          const label = t(labelKey);
-          const isActive =
-            (page === 'home' && pathname === '/explorer') ||
-            (page === 'map' && pathname.startsWith('/explorer/map')) ||
-            (page === 'wishlist' && pathname.startsWith('/explorer/wishlist')) ||
-            (page === 'profile' && pathname.startsWith('/explorer/you')) ||
-            (page === 'festival' && pathname.startsWith('/festival'));
+    <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 md:hidden w-[calc(100%-2rem)] max-w-md safe-area-bottom">
+      <div className="bg-[#17120E]/94 backdrop-blur-2xl border border-[#F6EAD7]/10 rounded-3xl p-1.5 shadow-[0_14px_40px_rgba(0,0,0,0.85)] flex items-center justify-between">
+        {TABS.map(({ id, icon: Icon, label }) => {
+          const isActive = currentPage === id;
+
           return (
             <button
-              key={page}
+              key={id}
               type="button"
-              onClick={() => handleNav(page)}
+              onClick={() => navTo(id)}
               aria-label={label}
-              className="flex flex-col items-center gap-1 relative px-4 py-1 rounded-xl transition-all"
+              className={`relative flex-1 flex flex-col items-center justify-center py-2 rounded-2xl transition-all duration-200 cursor-pointer ${
+                isActive ? 'bg-[#211A14] text-[#E0AF62] shadow-sm' : 'text-[#9E8B75] hover:text-[#F6EAD7]'
+              }`}
             >
-              {/* Active indicator dot */}
-              {isActive && (
-                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#8d5524]" />
-              )}
-
-              {/* Icon container */}
-              <div
-                className={`relative w-8 h-8 flex items-center justify-center rounded-xl transition-all ${
-                  isActive ? 'bg-[#8d5524]/10' : ''
-                }`}
-              >
-                <i
-                  className={`fas fa-${icon} text-lg transition-all ${
-                    isActive ? 'text-[#8d5524]' : 'text-gray-400'
-                  }`}
-                />
-
-                {/* Wishlist badge */}
-                {page === 'wishlist' && wishlist.length > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-black animate-bounce-soft">
-                    {wishlist.length}
+              <div className="relative">
+                <Icon className={`w-4 h-4 ${isActive ? 'text-[#C8893F]' : 'text-current'}`} />
+                {id === 'cart' && totalCart > 0 && (
+                  <span className="absolute -top-1.5 -right-2.5 min-w-[15px] h-3.5 px-0.5 rounded-full bg-[#C8893F] text-[#0E0B08] font-black text-[8px] flex items-center justify-center leading-none">
+                    {totalCart}
                   </span>
                 )}
+                {id === 'profile' && wishlist.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#C24136]" />
+                )}
               </div>
+              <span className="text-[9px] font-bold mt-1 tracking-tight">{label}</span>
 
-              <span
-                className={`text-[10px] font-bold transition-all ${
-                  isActive ? 'text-[#8d5524]' : 'text-gray-400'
-                }`}
-              >
-                {label}
-              </span>
+              {isActive && (
+                <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-[#C8893F] shadow-glow" />
+              )}
             </button>
           );
         })}

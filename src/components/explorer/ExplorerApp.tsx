@@ -3,39 +3,287 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/store/useStore';
+import { useExplorerRuntimeStore } from '@/store/useExplorerRuntimeStore';
 import { useT } from '@/i18n/useT';
 import ExplorerHeader from '@/components/explorer/ExplorerHeader';
 import ExplorerNav from '@/components/explorer/ExplorerNav';
 import HomePage from '@/components/explorer/HomePage';
 import ShopProfile from '@/components/explorer/ShopProfile';
 import ProductDetail from '@/components/explorer/ProductDetail';
+import MarketDetailPage from '@/components/explorer/MarketDetailPage';
+import CartPage from '@/components/explorer/CartPage';
+import ReservationsPage from '@/components/explorer/ReservationsPage';
 import WishlistPage from '@/components/explorer/WishlistPage';
 import MapPage from '@/components/explorer/MapPage';
+import NotificationsPage from '@/components/explorer/NotificationsPage';
+import InAppNotificationStack from '@/components/explorer/InAppNotificationStack';
 import Toast from '@/components/ui/Toast';
 import { type FilterState, DEFAULT_FILTERS } from '@/data/categories';
 import { useShops } from '@/hooks/useShops';
+import { useNotificationCenter } from '@/hooks/useNotificationCenter';
 import IntroBanner from '@/components/ui/IntroBanner';
-export type ExplorerRoutePage = 'home' | 'map' | 'wishlist' | 'shop' | 'product' | 'profile';
+import { getDefaultCity } from '@/lib/cities';
+import { getDistanceMeters } from '@/lib/geo';
+import type { Shop } from '@/types/shop';
+import type { AppNotification } from '@/types/notification';
+import PageTransition from '@/components/motion/PageTransition';
+import { Sparkles, Calendar, Compass, ShoppingBag, Heart, Store, Bookmark, LogOut, CheckCircle2, ShieldCheck, MapPin } from 'lucide-react';
+import PremiumButton from '@/components/ui/PremiumButton';
+
+export type ExplorerRoutePage =
+  | 'home'
+  | 'map'
+  | 'market'
+  | 'cart'
+  | 'reservations'
+  | 'wishlist'
+  | 'shop'
+  | 'product'
+  | 'profile'
+  | 'notifications';
+
+type SavedUser = {
+  id?: string;
+  name?: string;
+  email?: string;
+  img?: string;
+  role?: 'explorer' | 'owner';
+};
 
 export default function ExplorerApp({ routePage }: { routePage: ExplorerRoutePage }) {
   const router = useRouter();
-  const { user, currentPage, navTo } = useStore();
+  const {
+    user,
+    currentPage,
+    currentMarketSlug,
+    navTo,
+    setUser,
+    logout,
+    showToast,
+    wishlist,
+    savedCollections,
+    savedMarkets,
+    cart,
+  } = useStore();
+  const { activeTrip, startTrip, markTripArrived, clearTrip, completeTrip } =
+    useExplorerRuntimeStore();
   const t = useT();
 
+  const guestUser = {
+    id: 'guest',
+    name: 'Locara Explorer',
+    email: 'explorer@locara.app',
+    img: 'https://api.dicebear.com/7.x/notionists/svg?seed=explorer',
+    role: 'explorer' as const,
+  };
+  const effectiveUser = user ?? guestUser;
+
+  const [bootstrapped, setBootstrapped] = useState(false);
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const [selectedCity, setSelectedCity] = useState(getDefaultCity().name);
+  const [useGps, setUseGps] = useState(false);
+  const [profileTab, setProfileTab] = useState<'saved' | 'history' | 'settings'>('saved');
 
-  const { shops, loading, error, refetch } = useShops({ radius: 3000 });
+  const { shops, loading, error, refetch, userLocation } = useShops({
+    radius: 5000,
+    city: selectedCity,
+    autoGps: useGps,
+  });
+
+  const {
+    notifications,
+    popups,
+    unreadCount,
+    liveStatus,
+    markRead,
+    markAllRead,
+    dismissPopup,
+  } = useNotificationCenter();
 
   useEffect(() => {
-    if (!user) router.push('/');
-  }, [user, router]);
+    if (user) {
+      setBootstrapped(true);
+      return;
+    }
+
+    try {
+      const raw = localStorage.getItem('user_data');
+      if (raw) {
+        const parsed = JSON.parse(raw) as SavedUser;
+        if (parsed?.name) {
+          const role: 'owner' | 'explorer' = parsed.role === 'owner' ? 'owner' : 'explorer';
+          setUser(
+            {
+              id: parsed.id,
+              name: parsed.name,
+              email: parsed.email,
+              img:
+                parsed.img ||
+                `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(parsed.name)}`,
+              role,
+            },
+            role
+          );
+        }
+      }
+    } catch {
+      localStorage.removeItem('user_data');
+      localStorage.removeItem('auth_token');
+    } finally {
+      setBootstrapped(true);
+    }
+  }, [setUser, user]);
 
   useEffect(() => {
-    if (currentPage !== routePage) navTo(routePage);
-  }, [currentPage, routePage, navTo]);
+    if (currentPage !== routePage && !['market', 'cart', 'reservations'].includes(currentPage)) {
+      navTo(routePage);
+    }
+  }, [currentPage, navTo, routePage]);
 
-  if (!user) return null;
+  // Proximity & Geofence detection for active trip
+  useEffect(() => {
+    if (!activeTrip || !userLocation || activeTrip.arrivedAt) return;
+
+    const distance = getDistanceMeters(
+      userLocation.lat,
+      userLocation.lng,
+      activeTrip.destination.lat,
+      activeTrip.destination.lng
+    );
+
+    if (distance <= 100) {
+      markTripArrived();
+      showToast(`Arrived at ${activeTrip.shopName}! Check in at counter.`);
+    }
+  }, [activeTrip, markTripArrived, showToast, userLocation]);
+
+  const arrivalPromptVisible = Boolean(activeTrip?.arrivedAt && !activeTrip?.completedAt);
+
+  const handleCityChange = (city: string) => {
+    setSelectedCity(city);
+    setUseGps(false);
+  };
+
+  const handleUseGps = () => {
+    setUseGps(true);
+  };
+
+  const handleListYourShop = () => {
+    if (effectiveUser.role === 'owner') {
+      router.push('/register-shop');
+      return;
+    }
+    logout();
+    router.push('/?role=owner&mode=login&next=/register-shop');
+  };
+
+  const handleStartNavigation = (shop: Shop) => {
+    if (!shop.loc || shop.loc.length !== 2) return;
+
+    setUseGps(true);
+    startTrip({
+      shopId: shop.id,
+      shopName: shop.name,
+      destination: {
+        lat: shop.loc[0],
+        lng: shop.loc[1],
+      },
+    });
+    showToast(`Turn-by-turn navigation started for ${shop.name}`);
+    window.open(
+      `https://www.google.com/maps/dir/?api=1&destination=${shop.loc[0]},${shop.loc[1]}`,
+      '_blank',
+      'noopener,noreferrer'
+    );
+  };
+
+  const handleOpenNotification = (notification: AppNotification) => {
+    markRead(notification.id);
+    const target =
+      notification.url ||
+      (notification.shopId ? `/explorer/shop/${notification.shopId}` : '/explorer/notifications');
+    router.push(target);
+  };
+
+  // ── Explorer Profile & Account View ──────────────────────────────
+  const profileCard = (
+    <div className="mx-auto max-w-2xl space-y-6 pb-12">
+      {/* User Overview */}
+      <div className="rounded-3xl border border-[#F6EAD7]/10 bg-[#17120E] p-6 sm:p-8 shadow-xl">
+        <div className="flex items-center gap-2 mb-2">
+          <Sparkles className="w-4 h-4 text-[#C8893F]" />
+          <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#C8893F]">
+            EXPLORER PROFILE & SAVED GEMS
+          </span>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center gap-5 my-4">
+          <img
+            src={effectiveUser.img}
+            alt={effectiveUser.name}
+            className="h-20 w-20 rounded-3xl border-2 border-[#C8893F]/40 bg-[#211A14] object-cover shadow-glow-sm shrink-0"
+          />
+          <div className="text-center sm:text-left min-w-0 flex-1">
+            <h2 className="font-serif text-2xl font-bold text-[#F6EAD7]">{effectiveUser.name}</h2>
+            <p className="text-xs text-[#9E8B75] mt-0.5">{effectiveUser.email || 'Verified Explorer Account'}</p>
+            <span className="inline-block mt-2 px-3 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#C8893F]/15 text-[#E0AF62] border border-[#C8893F]/30">
+              {effectiveUser.role} Member
+            </span>
+          </div>
+        </div>
+
+        {/* Quick Stats Grid */}
+        <div className="grid grid-cols-3 gap-3 my-6 text-center">
+          <div className="p-3 rounded-2xl bg-[#211A14] border border-[#F6EAD7]/5">
+            <p className="font-serif text-xl font-bold text-[#F6EAD7]">{wishlist.length}</p>
+            <p className="text-[10px] text-[#9E8B75] mt-0.5">Saved Products</p>
+          </div>
+          <div className="p-3 rounded-2xl bg-[#211A14] border border-[#F6EAD7]/5">
+            <p className="font-serif text-xl font-bold text-[#E0AF62]">{cart.length}</p>
+            <p className="text-[10px] text-[#9E8B75] mt-0.5">Cart Items</p>
+          </div>
+          <div className="p-3 rounded-2xl bg-[#211A14] border border-[#F6EAD7]/5">
+            <p className="font-serif text-xl font-bold text-[#2D7D64]">Active</p>
+            <p className="text-[10px] text-[#9E8B75] mt-0.5">In-Store Status</p>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="space-y-3 pt-4 border-t border-[#F6EAD7]/10">
+          <button
+            type="button"
+            onClick={() => navTo('reservations')}
+            className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-[#211A14] hover:bg-[#2A2119] border border-[#F6EAD7]/10 text-xs font-bold text-[#F6EAD7] transition-all cursor-pointer"
+          >
+            <span className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-[#C8893F]" /> View My Active In-Store Reservations
+            </span>
+            <span className="text-[#E0AF62]">→</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleListYourShop}
+            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#C8893F] hover:bg-[#E0AF62] py-3.5 text-xs font-bold text-[#0E0B08] transition-all shadow-glow-sm cursor-pointer"
+          >
+            <Store className="w-4 h-4" /> Switch to Merchant / Store Owner Console
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              logout();
+              router.push('/');
+            }}
+            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#211A14] hover:bg-[#2A2119] border border-[#F6EAD7]/10 py-3 text-xs font-bold text-[#C24136] transition-all cursor-pointer"
+          >
+            <LogOut className="w-4 h-4" /> Sign Out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   const renderPage = () => {
     switch (currentPage) {
@@ -48,43 +296,46 @@ export default function ExplorerApp({ routePage }: { routePage: ExplorerRoutePag
             loading={loading}
             error={error}
             refetch={refetch}
+            onListShop={handleListYourShop}
           />
         );
       case 'shop':
         return <ShopProfile />;
       case 'product':
         return <ProductDetail />;
+      case 'market':
+        return <MarketDetailPage slug={currentMarketSlug || 'karol-bagh'} />;
+      case 'cart':
+        return <CartPage />;
+      case 'reservations':
+        return <ReservationsPage />;
       case 'wishlist':
         return <WishlistPage />;
       case 'map':
-        return <MapPage />;
-      case 'profile':
         return (
-          <div className="bg-white p-6 rounded-2xl border shadow-sm max-w-xl mx-auto">
-            <h2 className="text-2xl font-black text-[#ffffff] mb-2">{t('explorer_you_title')}</h2>
-            <p className="text-gray-500 mb-6">{t('explorer_you_sub')}</p>
-            <div className="flex items-center gap-4">
-              <img
-                src={user.img}
-                alt={user.name}
-                className="w-14 h-14 rounded-2xl border border-gray-200 object-cover bg-white"
-              />
-              <div className="min-w-0">
-                <p className="font-black text-gray-800 truncate">{user.name}</p>
-                <p className="text-xs text-gray-400">Explorer</p>
-              </div>
-            </div>
-            <div className="h-px bg-gray-100 my-6" />
-            <button
-              type="button"
-              onClick={() => router.push('/festival')}
-              className="w-full py-3 rounded-xl border border-gray-200 text-gray-700 font-bold hover:bg-gray-50 transition-all"
-            >
-              <i className="fas fa-calendar-alt mr-2" />
-              {t('explorer_browse_festivals')}
-            </button>
-          </div>
+          <MapPage
+            city={selectedCity}
+            query={query}
+            shops={shops}
+            loading={loading}
+            error={error}
+            userLocation={userLocation}
+            onRefetch={refetch}
+            onStartNavigation={handleStartNavigation}
+          />
         );
+      case 'notifications':
+        return (
+          <NotificationsPage
+            notifications={notifications}
+            unreadCount={unreadCount}
+            liveStatus={liveStatus}
+            onOpen={handleOpenNotification}
+            onMarkAllRead={markAllRead}
+          />
+        );
+      case 'profile':
+        return profileCard;
       default:
         return (
           <HomePage
@@ -94,15 +345,15 @@ export default function ExplorerApp({ routePage }: { routePage: ExplorerRoutePag
             loading={loading}
             error={error}
             refetch={refetch}
+            onListShop={handleListYourShop}
           />
         );
     }
   };
 
   return (
-    
-    <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
-      <IntroBanner city="Meerut" />
+    <div className="min-h-screen bg-[#0E0B08] text-[#F6EAD7]">
+      <IntroBanner city={useGps ? 'Your Area' : selectedCity} />
       <ExplorerHeader
         query={query}
         onQueryChange={setQuery}
@@ -110,13 +361,63 @@ export default function ExplorerApp({ routePage }: { routePage: ExplorerRoutePag
         onFiltersChange={setFilters}
         totalResults={shops.length}
         onRefetch={refetch}
+        selectedCity={selectedCity}
+        onCityChange={handleCityChange}
+        onUseGps={handleUseGps}
       />
-      
-      <main className="max-w-7xl mx-auto px-4 pt-4 pb-24">
-        <div key={currentPage} className="page-enter">
-          {renderPage()}
-        </div>
+
+      <main className="max-w-7xl mx-auto px-4 pt-4 pb-28">
+        <PageTransition pageKey={currentPage}>{renderPage()}</PageTransition>
       </main>
+
+      <InAppNotificationStack
+        notifications={popups}
+        onDismiss={dismissPopup}
+        onRead={markRead}
+      />
+
+      {/* Arrival Detected Modal */}
+      {arrivalPromptVisible && activeTrip && (
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
+          <div className="w-full max-w-md rounded-3xl border border-[#C8893F]/40 bg-[#17120E] p-6 shadow-2xl animate-scale-in text-center">
+            <div className="w-14 h-14 rounded-3xl bg-[#1E5544]/25 border border-[#1E5544]/50 flex items-center justify-center text-[#2D7D64] mx-auto mb-3 shadow-glow-emerald">
+              <MapPin className="w-7 h-7 text-[#2D7D64]" />
+            </div>
+
+            <p className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#E0AF62]">
+              STORE ARRIVAL DETECTED
+            </p>
+            <h3 className="mt-1 font-serif text-2xl font-bold text-[#F6EAD7]">
+              Looks like you&apos;ve arrived at {activeTrip.shopName}
+            </h3>
+            <p className="mt-2 text-xs leading-relaxed text-[#9E8B75]">
+              Show your reservation QR code or 6-digit OTP at the billing counter to verify pickup.
+            </p>
+
+            <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => clearTrip()}
+                className="flex-1 rounded-2xl border border-[#F6EAD7]/10 px-4 py-3 text-xs font-bold text-[#9E8B75] hover:bg-white/5 cursor-pointer"
+              >
+                Not Yet
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  completeTrip();
+                  clearTrip();
+                  navTo('reservations');
+                }}
+                className="flex-1 rounded-2xl bg-[#C8893F] hover:bg-[#E0AF62] px-4 py-3 text-xs font-bold text-[#0E0B08] shadow-glow-sm cursor-pointer"
+              >
+                Open Pickup QR Code
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ExplorerNav />
       <Toast />
     </div>

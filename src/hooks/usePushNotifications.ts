@@ -88,7 +88,15 @@ export function usePushNotifications(): UsePushReturn {
 
       // Get VAPID public key
       const vapidRes = await fetch('/api/push/vapid');
+      if (!vapidRes.ok) {
+        console.warn('[Push] VAPID endpoint not available');
+        return false;
+      }
       const { publicKey } = await vapidRes.json();
+      if (typeof publicKey !== 'string' || !publicKey.trim()) {
+        console.warn('[Push] Missing VAPID public key, push is disabled');
+        return false;
+      }
 
       // Subscribe to push manager
       const pushSub = await registration.pushManager.subscribe({

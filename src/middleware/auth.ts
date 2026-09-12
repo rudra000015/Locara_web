@@ -1,30 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
-
-const JWT_SECRET = process.env.JWT_SECRET;
-
-if (!JWT_SECRET) {
-  throw new Error("Missing JWT_SECRET environment variable");
-}
+import { extractBearerToken, verifyAuthToken } from "@/lib/auth";
 
 export interface AuthPayload {
   id: string;
   email: string;
+  role: "explorer" | "owner";
   iat: number;
   exp: number;
 }
 
 export function requireAuth(request: NextRequest): AuthPayload {
-  const authorizationHeader = request.headers.get("authorization");
-
-  if (!authorizationHeader || !authorizationHeader.startsWith("Bearer ")) {
+  const token = extractBearerToken(request);
+  if (!token) {
     throw new Error("Unauthorized");
   }
 
-  const token = authorizationHeader.split(" ")[1];
-
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as AuthPayload;
+    const decoded = verifyAuthToken(token) as unknown as AuthPayload;
     return decoded;
   } catch (error) {
     throw new Error("Invalid or expired token");

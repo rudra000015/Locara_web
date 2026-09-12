@@ -1,144 +1,318 @@
 'use client';
 
-import { SHOPS } from '@/data/shops';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useShopDetail } from '@/hooks/useShops';
 import { useStore } from '@/store/useStore';
 import { prodImg } from '@/utils/prodImg';
+import {
+  ChevronLeft,
+  Heart,
+  Store,
+  Star,
+  Clock,
+  Sparkles,
+  Share2,
+  CheckCircle2,
+  Navigation,
+  ShoppingBag,
+  ShieldCheck,
+  Tag,
+  Camera,
+} from 'lucide-react';
+import PremiumButton from '@/components/ui/PremiumButton';
+import ReservationModal from './ReservationModal';
+import ReservationConfirmationModal from './ReservationConfirmationModal';
+import VisualSearchModal from './VisualSearchModal';
 
 export default function ProductDetail() {
   const router = useRouter();
-  const { currentShopId, currentProdId, openShop, viewProduct, toggleWish, isWished } = useStore();
+  const { currentShopId, currentProdId, openShop, viewProduct, toggleWish, isWished, addToCart, navTo, showToast } = useStore();
+  const { shop, loading, error } = useShopDetail(currentShopId);
 
-  const s = SHOPS.find(x => x.id === currentShopId);
-  const p = s?.products.find(x => x.id === currentProdId);
-  const prodIndex = s?.products.indexOf(p!) ?? 0;
-  const others = s?.products.filter(x => x.id !== currentProdId).slice(0, 4) ?? [];
+  const [selectedSize, setSelectedSize] = useState('M');
+  const [selectedColor, setSelectedColor] = useState('Black');
+  const [quantity, setQuantity] = useState(1);
+  const [isReserveModalOpen, setIsReserveModalOpen] = useState(false);
+  const [confirmedReservation, setConfirmedReservation] = useState<any | null>(null);
+  const [showSimilarModal, setShowSimilarModal] = useState(false);
 
-  if (!s || !p) {
+  if (loading) {
     return (
-      <div className="text-center py-20">
-        <p className="text-gray-400">Product not found.</p>
+      <div className="max-w-4xl mx-auto py-16 text-center">
+        <div className="w-10 h-10 mx-auto border-2 border-[#C8893F] border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs text-[#9E8B75] mt-4 font-mono tracking-wider uppercase">Loading product showcase...</p>
+      </div>
+    );
+  }
+
+  const s = shop;
+  const p = s?.products.find((x) => x.id === currentProdId);
+  const prodIndex = s?.products.findIndex((x) => x.id === currentProdId) ?? 0;
+  const others = s?.products.filter((x) => x.id !== currentProdId).slice(0, 4) ?? [];
+
+  if (error || !s || !p) {
+    return (
+      <div className="max-w-md mx-auto py-24 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-[#17120E] border border-[#F6EAD7]/10 flex items-center justify-center text-2xl mx-auto mb-3">
+          🔍
+        </div>
+        <h3 className="font-serif text-lg font-bold text-[#F6EAD7] mb-1">Product Not Found</h3>
+        <p className="text-xs text-[#9E8B75] mb-6">This item could not be retrieved.</p>
+        <button onClick={() => navTo('home')} className="btn-gold text-xs">
+          Return to Explorer
+        </button>
       </div>
     );
   }
 
   const wished = isWished(s.id, p.id);
+  const imgSrc = p.image || prodImg(p.name, prodIndex);
+  const advanceAmount = Math.round(p.price * 0.1);
+  const balanceAmount = p.price - advanceAmount;
+
+  const handleAddToCart = () => {
+    addToCart({
+      productId: p.id,
+      name: p.name,
+      price: p.price,
+      unit: p.unit || 'unit',
+      size: selectedSize,
+      color: selectedColor,
+      quantity,
+      shopId: s.id,
+      shopName: s.name,
+      shopAddress: s.addr,
+      image: imgSrc,
+    });
+  };
 
   return (
-    <>
-      {/* Back button */}
+    <div className="max-w-4xl mx-auto pb-16">
+      {/* Back Button */}
       <button
         onClick={() => {
           openShop(s.id);
           router.push(`/explorer/shop/${s.id}`);
         }}
-        className="mb-6 text-sm font-bold text-gray-500 hover:text-[#8d5524] flex items-center gap-2 transition-colors"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#17120E] border border-[#F6EAD7]/10 text-xs font-bold text-[#9E8B75] hover:text-[#F6EAD7] hover:bg-[#211A14] transition-all mb-6 cursor-pointer"
       >
-        <i className="fas fa-arrow-left" /> Back to Shop
+        <ChevronLeft className="w-4 h-4" /> Back to {s.name}
       </button>
 
-      <div className="bg-white rounded-[2.5rem] p-6 md:p-10 shadow-lg border">
+      {/* Main Showcase Card */}
+      <div className="bg-[#17120E] border border-[#F6EAD7]/10 rounded-3xl p-6 sm:p-10 shadow-2xl">
         <div className="flex flex-col md:flex-row gap-8">
-
-          {/* Product image */}
-          <div className="w-full md:w-96 aspect-square bg-gray-50 rounded-3xl overflow-hidden relative shadow-inner flex-shrink-0">
+          {/* Media Image Gallery */}
+          <div className="w-full md:w-96 aspect-square bg-[#211A14] rounded-3xl overflow-hidden relative border border-[#F6EAD7]/10 shrink-0">
             <img
-              src={prodImg(p.name, prodIndex)}
-              className="w-full h-full object-cover"
+              src={imgSrc}
               alt={p.name}
+              className="w-full h-full object-cover"
             />
             {p.isNew && (
-              <span className="absolute top-4 left-4 bg-gradient-to-r from-[#8d5524] to-[#b87333] text-white text-sm font-black px-4 py-1 rounded-full">
-                NEW ARRIVAL
+              <span className="absolute top-4 left-4 px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-[#C8893F] text-[#0E0B08] flex items-center gap-1 shadow-glow-sm">
+                <Sparkles className="w-3 h-3" /> NEW ARRIVAL
               </span>
             )}
-            {/* Wishlist button on image */}
             <button
-              onClick={() => toggleWish(s.id, p.id, p, s.name)}
-              className={`absolute top-4 right-4 w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110 ${
-                wished ? 'bg-red-500' : 'bg-white'
-              }`}
+              onClick={() =>
+                toggleWish(
+                  s.id,
+                  p.id,
+                  {
+                    id: p.id,
+                    name: p.name,
+                    price: p.price,
+                    unit: p.unit || 'unit',
+                    inStock: true,
+                    isNew: Boolean(p.isNew),
+                    image: imgSrc,
+                    category: p.category || s.cat,
+                  },
+                  s.name
+                )
+              }
+              title={wished ? 'Remove from Wishlist' : 'Save to Wishlist'}
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/70 backdrop-blur-md border border-white/10 flex items-center justify-center hover:scale-110 transition-all text-white cursor-pointer"
             >
-              <i className={`${wished ? 'fas text-white' : 'far text-gray-400'} fa-heart text-lg`} />
+              <Heart
+                className={`w-5 h-5 ${wished ? 'text-[#C24136] fill-[#C24136]' : 'text-white'}`}
+              />
             </button>
           </div>
 
-          {/* Product info */}
-          <div className="flex-grow">
-            {/* Shop breadcrumb */}
-            <p
-              className="text-xs font-bold text-[#8d5524] uppercase tracking-widest mb-2 cursor-pointer hover:underline"
-              onClick={() => {
-                openShop(s.id);
-                router.push(`/explorer/shop/${s.id}`);
-              }}
-            >
-              <i className="fas fa-store mr-1" />{s.name} • Since {s.est}
-            </p>
+          {/* Details & Selectors */}
+          <div className="flex-1 flex flex-col justify-between">
+            <div>
+              {/* Origin Shop Link */}
+              <p
+                onClick={() => {
+                  openShop(s.id);
+                  router.push(`/explorer/shop/${s.id}`);
+                }}
+                className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-[#E0AF62] uppercase tracking-wider mb-2 cursor-pointer hover:underline"
+              >
+                <Store className="w-3.5 h-3.5 text-[#C8893F]" />
+                {s.name} • Est. {s.est}
+              </p>
 
-            <h2 className="text-4xl font-black text-gray-800 mb-4">{p.name}</h2>
+              <h1 className="font-serif text-2xl sm:text-4xl font-bold text-[#F6EAD7] mb-2">
+                {p.name}
+              </h1>
 
-            <p className="text-3xl font-black text-[#8d5524] mb-6">
-              ₹{p.price}{' '}
-              <span className="text-base text-gray-400 font-normal">per {p.unit}</span>
-            </p>
-
-            {/* Badges */}
-            <div className="flex items-center gap-3 mb-6 flex-wrap">
-              <span className={`px-4 py-2 rounded-full text-sm font-bold ${
-                p.inStock ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'
-              }`}>
-                <i className={`fas fa-${p.inStock ? 'check-circle' : 'times-circle'} mr-1`} />
-                {p.inStock ? 'In Stock' : 'Out of Stock'}
-              </span>
-              <span className="px-4 py-2 bg-amber-50 text-amber-700 rounded-full text-sm font-bold">
-                <i className="fas fa-star mr-1" />{s.rating} rated
-              </span>
-              <span className="px-4 py-2 bg-[#8d5524]/8 text-[#8d5524] rounded-full text-sm font-bold">
-                {s.age} yrs legacy
-              </span>
-            </div>
-
-            {/* Shop story */}
-              <div className="bg-gray-50 p-5 rounded-2xl mb-6 border-l-4 border-[#8d5524]">
-                <h4 className="font-bold text-sm text-gray-600 mb-2">About this shop</h4>
-                <p className="text-sm text-gray-500 italic">&quot;{s.story}&quot;</p>
-                <p className="text-xs text-gray-400 mt-2">
-                  <i className="fas fa-map-marker-alt mr-1" />{s.addr}
-                </p>
+              {/* Pricing & 10% Advance Breakdown */}
+              <div className="flex items-baseline gap-3 mb-4">
+                <span className="font-mono text-3xl font-bold text-[#E0AF62]">
+                  ₹{p.price.toLocaleString('en-IN')}
+                </span>
+                <span className="text-xs text-[#9E8B75]">per {p.unit || 'piece'}</span>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#1E5544]/25 text-[#2D7D64] border border-[#1E5544]/40">
+                  Reserve for ₹{advanceAmount} (10%)
+                </span>
               </div>
 
-            {/* CTA */}
+              {/* Status Pills */}
+              <div className="flex flex-wrap items-center gap-2 mb-5">
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#1E5544]/15 text-[#2D7D64] border border-[#1E5544]/30 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> In Stock at Shop
+                </span>
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#211A14] text-[#F6EAD7] border border-[#F6EAD7]/10 flex items-center gap-1">
+                  <Star className="w-3.5 h-3.5 text-[#C8893F] fill-[#C8893F]" /> {s.rating} Rating
+                </span>
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#C8893F]/10 text-[#E0AF62] border border-[#C8893F]/20 font-mono">
+                  {s.age} Yrs Heritage
+                </span>
+              </div>
+
+              {/* Variant Selectors */}
+              <div className="space-y-3 mb-6 p-4 rounded-2xl bg-[#211A14] border border-[#F6EAD7]/10">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-mono uppercase text-[#9E8B75] font-bold">Size / Format:</span>
+                  <div className="flex gap-1.5">
+                    {['S', 'M', 'L', 'XL'].map((sz) => (
+                      <button
+                        key={sz}
+                        type="button"
+                        onClick={() => setSelectedSize(sz)}
+                        className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${
+                          selectedSize === sz
+                            ? 'bg-[#C8893F] text-[#0E0B08]'
+                            : 'bg-[#17120E] text-[#D8C4A7] hover:bg-white/5'
+                        }`}
+                      >
+                        {sz}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-mono uppercase text-[#9E8B75] font-bold">Color:</span>
+                  <div className="flex gap-1.5">
+                    {['Black', 'Cream', 'Emerald', 'Gold'].map((clr) => (
+                      <button
+                        key={clr}
+                        type="button"
+                        onClick={() => setSelectedColor(clr)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                          selectedColor === clr
+                            ? 'bg-[#E0AF62] text-[#0E0B08]'
+                            : 'bg-[#17120E] text-[#D8C4A7] hover:bg-white/5'
+                        }`}
+                      >
+                        {clr}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Physical Shop Information */}
+              <div className="p-3.5 rounded-2xl bg-[#1B140F] border border-[#F6EAD7]/10 mb-6 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-[#F6EAD7]">{s.name}</p>
+                  <p className="text-[11px] text-[#9E8B75] truncate max-w-xs">{s.addr}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (s.loc && s.loc.length === 2) {
+                      window.open(
+                        `https://www.google.com/maps/dir/?api=1&destination=${s.loc[0]},${s.loc[1]}`,
+                        '_blank'
+                      );
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-[#211A14] hover:bg-[#2A2119] border border-[#F6EAD7]/10 text-xs font-bold text-[#E0AF62] flex items-center gap-1"
+                >
+                  <Navigation className="w-3 h-3" /> Navigate
+                </button>
+              </div>
+            </div>
+
+            {/* Primary Actions: Cart & 10% Reservation */}
+            <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-[#F6EAD7]/10">
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                className="py-3 px-5 rounded-2xl bg-[#211A14] hover:bg-[#2A2119] border border-[#F6EAD7]/15 text-xs font-bold text-[#F6EAD7] flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <ShoppingBag className="w-4 h-4 text-[#C8893F]" /> Add to Cart
+              </button>
+
+              <PremiumButton
+                variant="gold"
+                size="lg"
+                onClick={() => setIsReserveModalOpen(true)}
+                className="flex-1"
+                magnetic
+              >
+                Reserve Now for ₹{advanceAmount}
+              </PremiumButton>
+            </div>
+
             <button
-              onClick={() => toggleWish(s.id, p.id, p, s.name)}
-              className="w-full py-4 rounded-xl font-bold text-lg shadow-lg bg-gradient-to-br from-[#8d5524] to-[#b87333] text-white hover:shadow-xl hover:-translate-y-0.5 transition-all"
+              type="button"
+              onClick={() => setShowSimilarModal(true)}
+              className="w-full mt-3 py-2.5 rounded-2xl bg-[#17120E] hover:bg-[#211A14] border border-[#C8893F]/30 text-xs font-bold text-[#E0AF62] flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
-              <i className={`${wished ? 'fas' : 'far'} fa-heart mr-2`} />
-              {wished ? 'Saved to Wishlist' : 'Save to Wishlist'}
+              <Camera className="w-4 h-4 text-[#C8893F]" />
+              <span>Find Similar Styles in Nearby Shops</span>
             </button>
           </div>
         </div>
 
-        {/* More from this shop */}
+        {/* More creations from this shop */}
         {others.length > 0 && (
-          <div className="mt-10 pt-8 border-t">
-            <h3 className="text-xl font-black text-gray-800 mb-4">More from {s.name}</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="mt-12 pt-8 border-t border-[#F6EAD7]/10">
+            <h3 className="font-serif font-bold text-lg text-[#F6EAD7] mb-4">
+              More Creations from {s.name}
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {others.map((o, oi) => (
                 <div
                   key={o.id}
-                  className="bg-gray-50 rounded-2xl overflow-hidden border cursor-pointer transition-all hover:-translate-y-1 hover:shadow-md"
                   onClick={() => {
                     viewProduct(s.id, o.id);
                     router.push(`/explorer/product/${s.id}/${o.id}`);
                   }}
+                  className="rounded-2xl bg-[#211A14] border border-[#F6EAD7]/10 overflow-hidden hover:border-[#C8893F]/40 transition-all cursor-pointer group"
                 >
-                  <div className="aspect-square bg-gray-100">
-                    <img src={prodImg(o.name, oi + 10)} className="w-full h-full object-cover" alt={o.name} />
+                  <div className="aspect-square bg-[#1B140F] overflow-hidden">
+                    <img
+                      src={o.image || prodImg(o.name, oi + 10)}
+                      alt={o.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
                   </div>
                   <div className="p-3">
-                    <h4 className="font-bold text-sm line-clamp-1">{o.name}</h4>
-                    <p className="font-black text-[#8d5524] text-sm">₹{o.price}</p>
+                    <p className="font-serif font-bold text-xs text-[#F6EAD7] group-hover:text-[#E0AF62] truncate">
+                      {o.name}
+                    </p>
+                    <p className="font-mono text-xs font-bold text-[#E0AF62] mt-1">
+                      ₹{o.price.toLocaleString('en-IN')}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -146,6 +320,47 @@ export default function ProductDetail() {
           </div>
         )}
       </div>
-    </>
+
+      {/* Reservation Checkout Modal */}
+      {isReserveModalOpen && (
+        <ReservationModal
+          isOpen={isReserveModalOpen}
+          onClose={() => setIsReserveModalOpen(false)}
+          product={{
+            id: p.id,
+            name: p.name,
+            price: p.price,
+            unit: p.unit,
+            image: imgSrc,
+            category: p.category,
+          }}
+          shop={{
+            id: s.id,
+            name: s.name,
+            addr: s.addr,
+            loc: s.loc,
+          }}
+          onSuccess={(res) => {
+            setIsReserveModalOpen(false);
+            setConfirmedReservation(res);
+          }}
+        />
+      )}
+
+      {/* Confirmation Success Modal */}
+      {confirmedReservation && (
+        <ReservationConfirmationModal
+          isOpen={Boolean(confirmedReservation)}
+          onClose={() => setConfirmedReservation(null)}
+          reservation={confirmedReservation}
+        />
+      )}
+
+      {/* Visual Search Modal */}
+      <VisualSearchModal
+        open={showSimilarModal}
+        onOpenChange={setShowSimilarModal}
+      />
+    </div>
   );
 }

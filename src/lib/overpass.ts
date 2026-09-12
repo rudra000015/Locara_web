@@ -56,7 +56,10 @@ function buildSearchQuery(searchTerm: string, lat: number, lng: number, radiusMe
 async function fetchOverpass(query: string): Promise<any[]> {
   const res = await fetch(OVERPASS_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'Locara/1.0 (Heritage Discovery; contact@locara.app)',
+    },
     body: `data=${encodeURIComponent(query)}`,
     next: { revalidate: 3600 }, // cache 1 hour
   });

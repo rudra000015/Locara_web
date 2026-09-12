@@ -114,6 +114,7 @@ export interface Shop {
   placeId: string;
   name: string;
   cat: ShopCategory;
+  distanceMeters?: number;
 
   est: number;
   age: number;

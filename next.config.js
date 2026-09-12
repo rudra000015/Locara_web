@@ -14,10 +14,6 @@ const nextConfig = {
 
   productionBrowserSourceMaps: false,
 
-  experimental: {
-    workerThreads: true,
-  },
-
   images: {
     domains: ['api.dicebear.com', 'www.svgrepo.com', 'images.unsplash.com'],
     formats: ['image/avif', 'image/webp'],
@@ -94,6 +90,20 @@ const nextConfig = {
       afterFiles: [],
       fallback: [],
     };
+  },
+
+  webpack: (config) => {
+    config.module.rules.push({
+      test: /\.html$/,
+      resourceQuery: /raw/,
+      type: 'asset/source',
+    });
+    config.module.rules.push({
+      test: /\.html$/,
+      resourceQuery: { not: [/raw/] },
+      type: 'asset/source',
+    });
+    return config;
   },
 };
 

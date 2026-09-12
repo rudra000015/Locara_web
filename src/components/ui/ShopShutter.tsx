@@ -1,202 +1,239 @@
 "use client";
-/**
- * FancyShutter — scroll-to-pull rope mechanic
- *
- * Dependencies to install:
- *   pnpm dlx shadcn add @fancy/basic-number-ticker
- *
- * Place at: src/components/ui/FancyShutter.tsx
- */
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 
-export default function FancyShutter({ children }: { children: React.ReactNode }) {
-  const [isOpen, setIsOpen]           = useState(false);
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+
+interface FancyShutterProps {
+  children: React.ReactNode;
+  onOpen?: () => void;
+}
+
+const TOTAL_SCROLL_NEEDED = 280;
+const SHUTTER_ANIMATION_MS = 1800;
+const OPEN_START_DELAY_MS = 80;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+export default function FancyShutter({ children, onOpen }: FancyShutterProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
   const [pullProgress, setPullProgress] = useState(0);
-  const [isAnimating, setIsAnimating]   = useState(false);
-  const [audio, setAudio]               = useState<HTMLAudioElement | null>(null);
-  const [hasPlayedSound, setHasPlayedSound] = useState(false); // Track if sound has been played
 
-  const totalScrollNeeded = 320;
   const accumulatedScroll = useRef(0);
-  const containerRef      = useRef<HTMLDivElement>(null);
-  const ropePulled        = useRef(false);
+  const lastTouchY = useRef<number | null>(null);
+  const hasTriggeredOpen = useRef(false);
+  const hasCalledOnOpen = useRef(false);
 
-  const [audioEnabled, setAudioEnabled] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const soundStartedRef = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // For development: auto-open after 3 seconds if no interaction
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!isOpen && !ropePulled.current) {
-        console.log('Auto-opening shutter for development');
-        setIsAnimating(true);
-        setTimeout(() => {
-          setIsOpen(true);
-          sessionStorage.setItem("shutter_opened", "true");
-        }, 100);
-      }
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, [isOpen]);
+  const ROPE_TOP = 80;
+  const ROPE_BOTTOM = 320;
+  const ringY = ROPE_TOP + (1 - pullProgress) * (ROPE_BOTTOM - ROPE_TOP);
 
   useEffect(() => {
-    const audioElement = new Audio();
-    audioElement.src = "/sounds/videoplayback.mp3";
-    audioElement.volume = 0.7;
-    audioElement.preload = "auto";
+    const audio = new Audio("/sounds/videoplayback.mp3");
+    audio.volume = 0.6;
+    audio.preload = "auto";
+    audioRef.current = audio;
 
-    // Add event listeners for better audio handling
-    audioElement.addEventListener('canplaythrough', () => {
-      console.log('Audio loaded and ready to play');
-    });
+    const onError = () => {
+      audioRef.current = null;
+    };
 
-    audioElement.addEventListener('error', (e) => {
-      console.error('Audio loading error:', e);
-    });
+    audio.addEventListener("error", onError);
+    audio.load();
 
-    audioElement.addEventListener('loadstart', () => {
-      console.log('Audio loading started');
-    });
-
-    // Try to load the audio
-    audioElement.load();
-
-    setAudio(audioElement);
-
-    // Cleanup
     return () => {
-      audioElement.pause();
-      audioElement.src = '';
-      audioElement.removeEventListener('canplaythrough', () => {});
-      audioElement.removeEventListener('error', () => {});
-      audioElement.removeEventListener('loadstart', () => {});
+      audio.pause();
+      audio.removeEventListener("error", onError);
+      audioRef.current = null;
     };
   }, []);
 
-  // Enable audio on first user interaction
-  const enableAudio = useCallback(() => {
-    if (!audioEnabled && audio) {
-      setAudioEnabled(true);
-      console.log('Audio enabled on user interaction');
-    }
-  }, [audioEnabled, audio]);
+  const playOpenSound = useCallback(() => {
+    if (soundStartedRef.current) return;
 
-  // ── Wheel / touch handlers ────────────────────────────────
-  const handleWheel = useCallback((e: WheelEvent) => {
-    if (isOpen || isAnimating || ropePulled.current) return;
-    e.preventDefault();
-    enableAudio(); // Enable audio on first interaction
-    accumulatedScroll.current = Math.min(
-      totalScrollNeeded,
-      Math.max(0, accumulatedScroll.current + e.deltaY)
-    );
-    const p = accumulatedScroll.current / totalScrollNeeded;
-    setPullProgress(p);
-    if (p >= 1) { ropePulled.current = true; triggerOpen(); }
-  }, [isOpen, isAnimating, enableAudio]);
+    const audio = audioRef.current;
 
-  const lastTouchY = useRef<number | null>(null);
-  const handleTouchStart = useCallback((e: TouchEvent) => {
-    lastTouchY.current = e.touches[0].clientY;
-    enableAudio(); // Enable audio on first interaction
-  }, [enableAudio]);
-  const handleTouchMove = useCallback((e: TouchEvent) => {
-    if (isOpen || isAnimating || ropePulled.current) return;
-    if (lastTouchY.current === null) return;
-    e.preventDefault();
-    const delta = lastTouchY.current - e.touches[0].clientY;
-    lastTouchY.current = e.touches[0].clientY;
-    accumulatedScroll.current = Math.min(
-      totalScrollNeeded,
-      Math.max(0, accumulatedScroll.current + delta)
-    );
-    const p = accumulatedScroll.current / totalScrollNeeded;
-    setPullProgress(p);
-    if (p >= 1) { ropePulled.current = true; triggerOpen(); }
-  }, [isOpen, isAnimating]);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    el.addEventListener("wheel",      handleWheel,      { passive: false });
-    el.addEventListener("touchstart", handleTouchStart, { passive: true  });
-    el.addEventListener("touchmove",  handleTouchMove,  { passive: false });
-    return () => {
-      el.removeEventListener("wheel",      handleWheel);
-      el.removeEventListener("touchstart", handleTouchStart);
-      el.removeEventListener("touchmove",  handleTouchMove);
-    };
-  }, [handleWheel, handleTouchStart, handleTouchMove]);
-
-  // ── Open sequence ─────────────────────────────────────────
-  const triggerOpen = () => {
-    setIsAnimating(true);
-
-    // Start shutter animation immediately
-    setTimeout(() => {
-      setIsOpen(true);
-      sessionStorage.setItem("shutter_opened", "true");
-    }, 100);
-
-    // Start audio ONLY on the first scroll (no repetition)
-    if (!hasPlayedSound) {
-      setTimeout(() => {
-        if (audio) {
-          try {
-            audio.currentTime = 0;
-            const playPromise = audio.play();
-            if (playPromise !== undefined) {
-              playPromise.then(() => {
-                console.log('Shutter audio started');
-                setHasPlayedSound(true); // Mark sound as played
-              }).catch(error => {
-                console.warn('Shutter audio failed:', error);
-              });
-            }
-          } catch (error) {
-            console.error('Audio error:', error);
-          }
-        }
-      }, 200);
-    }
-  };
-
-  // Stop audio after shutter animation completes (2.2 seconds)
-  useEffect(() => {
-    if (isOpen && audio) {
-      // Let audio play for the full animation duration
-      const audioTimeout = setTimeout(() => {
-        audio.pause();
+    try {
+      soundStartedRef.current = true;
+      if (audio) {
         audio.currentTime = 0;
-        console.log('Audio stopped - shutter animation complete');
-      }, 2200); // 2.2 seconds matches the slat animation duration
-      
-      return () => clearTimeout(audioTimeout);
-    }
-  }, [isOpen, audio]);
+        const playPromise = audio.play();
+        if (playPromise) {
+          playPromise.catch(() => {});
+        }
+        return;
+      }
 
-  // ── Rope geometry ─────────────────────────────────────────
-  const ROPE_TOP    = 80;
-  const ROPE_BOTTOM = 340;
-  const ringY       = ROPE_TOP + (1 - pullProgress) * (ROPE_BOTTOM - ROPE_TOP);
-  const ropeSlack   = (1 - pullProgress) * 18;
+      const AudioCtor =
+        window.AudioContext ||
+        (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtor) return;
+
+      const ctx = audioContextRef.current ?? new AudioCtor();
+      audioContextRef.current = ctx;
+
+      if (ctx.state === "suspended") {
+        void ctx.resume();
+      }
+
+      const now = ctx.currentTime;
+      const gain = ctx.createGain();
+      gain.connect(ctx.destination);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.15, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+
+      const oscillator = ctx.createOscillator();
+      oscillator.type = "square";
+      oscillator.frequency.setValueAtTime(1200, now);
+      oscillator.frequency.exponentialRampToValueAtTime(160, now + 0.18);
+      oscillator.connect(gain);
+      oscillator.start(now);
+      oscillator.stop(now + 0.22);
+    } catch {
+      // Audio is non-blocking
+    }
+  }, []);
+
+  const stopOpenSound = useCallback(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+  }, []);
+
+  const triggerOpen = useCallback(() => {
+    if (hasTriggeredOpen.current || isAnimating || isOpen) return;
+
+    hasTriggeredOpen.current = true;
+    setIsAnimating(true);
+    playOpenSound();
+
+    window.setTimeout(() => {
+      setIsOpen(true);
+      try {
+        sessionStorage.setItem("shutter_opened", "true");
+        sessionStorage.setItem("shutter_opened_at", String(Date.now()));
+      } catch {
+        // Storage fallback
+      }
+    }, OPEN_START_DELAY_MS);
+  }, [isAnimating, isOpen, playOpenSound]);
+
+  const updateProgressFromDelta = useCallback(
+    (delta: number) => {
+      if (isOpen || isAnimating || hasTriggeredOpen.current) return;
+
+      accumulatedScroll.current = clamp(
+        accumulatedScroll.current + delta,
+        0,
+        TOTAL_SCROLL_NEEDED
+      );
+
+      const nextProgress = accumulatedScroll.current / TOTAL_SCROLL_NEEDED;
+      setPullProgress(nextProgress);
+
+      if (nextProgress >= 1) {
+        triggerOpen();
+      }
+    },
+    [isAnimating, isOpen, triggerOpen]
+  );
+
+  const handleWheel = useCallback(
+    (event: WheelEvent) => {
+      if (isOpen || isAnimating || hasTriggeredOpen.current) return;
+      event.preventDefault();
+      updateProgressFromDelta(event.deltaY);
+    },
+    [isAnimating, isOpen, updateProgressFromDelta]
+  );
+
+  const handleTouchStart = useCallback((event: TouchEvent) => {
+    lastTouchY.current = event.touches[0]?.clientY ?? null;
+  }, []);
+
+  const handleTouchMove = useCallback(
+    (event: TouchEvent) => {
+      if (isOpen || isAnimating || hasTriggeredOpen.current) return;
+      if (lastTouchY.current === null) return;
+
+      const currentY = event.touches[0]?.clientY;
+      if (typeof currentY !== "number") return;
+
+      event.preventDefault();
+      const delta = lastTouchY.current - currentY;
+      lastTouchY.current = currentY;
+      updateProgressFromDelta(delta);
+    },
+    [isAnimating, isOpen, updateProgressFromDelta]
+  );
+
+  const handleTouchEnd = useCallback(() => {
+    lastTouchY.current = null;
+  }, []);
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element || isOpen) return;
+
+    element.addEventListener("wheel", handleWheel, { passive: false });
+    element.addEventListener("touchstart", handleTouchStart, { passive: true });
+    element.addEventListener("touchmove", handleTouchMove, { passive: false });
+    element.addEventListener("touchend", handleTouchEnd, { passive: true });
+
+    return () => {
+      element.removeEventListener("wheel", handleWheel);
+      element.removeEventListener("touchstart", handleTouchStart);
+      element.removeEventListener("touchmove", handleTouchMove);
+      element.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [isOpen, handleWheel, handleTouchStart, handleTouchMove, handleTouchEnd]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const stopAudioTimer = window.setTimeout(() => {
+      stopOpenSound();
+    }, SHUTTER_ANIMATION_MS);
+
+    const onOpenTimer = window.setTimeout(() => {
+      if (!hasCalledOnOpen.current) {
+        hasCalledOnOpen.current = true;
+        onOpen?.();
+      }
+    }, SHUTTER_ANIMATION_MS);
+
+    return () => {
+      window.clearTimeout(stopAudioTimer);
+      window.clearTimeout(onOpenTimer);
+    };
+  }, [isOpen, onOpen, stopOpenSound]);
 
   const totalSlats = 14;
-
   const containerVariants = {
-    exit: { transition: { staggerChildren: 0.07, staggerDirection: -1 } },
+    exit: { transition: { staggerChildren: 0.05, staggerDirection: -1 as const } },
   };
   const slatVariants = {
     initial: { y: 0 },
-    exit: { y: "-110vh", transition: { duration: 2.2, ease: [0.42, 0, 0.55, 1] as any } },
+    exit: {
+      y: "-110vh",
+      transition: { duration: 1.6, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] },
+    },
   };
 
   return (
     <div
       ref={containerRef}
-      className="relative min-h-screen overflow-hidden"
-      style={{ background: "linear-gradient(135deg, #fdfbf7 0%, #f5e6d3 100%)" }}
+      className="relative min-h-screen overflow-hidden bg-[#080808]"
     >
       <AnimatePresence>
         {!isOpen && (
@@ -206,157 +243,91 @@ export default function FancyShutter({ children }: { children: React.ReactNode }
             initial="initial"
             animate="initial"
             exit="exit"
-            className="fixed inset-0 z-[100] flex flex-col"
+            className="fixed inset-0 z-[100] flex flex-col bg-[#080808]"
           >
-            {/* ── Slats ──────────────────────────────────── */}
             {Array.from({ length: totalSlats }).map((_, i) => (
               <motion.div
                 key={i}
                 variants={slatVariants}
-                className="w-full flex-1 border-b border-black/10 relative"
+                className="w-full flex-1 border-b border-black/40 relative"
                 style={{
-                  background: i % 2 === 0
-                    ? "linear-gradient(180deg, #D4885A 0%, #E8A868 40%, #8F5820 60%, #D4885A 100%)"
-                    : "linear-gradient(180deg, #8F5820 0%, #D4885A 40%, #7A4A1F 60%, #8F5820 100%)",
-                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(0,0,0,0.15)",
+                  background:
+                    i % 2 === 0
+                      ? "linear-gradient(180deg, #181818 0%, #202020 40%, #121212 60%, #181818 100%)"
+                      : "linear-gradient(180deg, #121212 0%, #1a1a1a 40%, #0d0d0d 60%, #121212 100%)",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), inset 0 -1px 0 rgba(0,0,0,0.4)",
                 }}
               >
-                {[15, 50, 85].map(pct => (
-                  <div key={pct} className="absolute top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full"
-                    style={{ left: `${pct}%`, background: "rgba(255,255,255,0.14)", boxShadow: "0 1px 2px rgba(0,0,0,0.3)" }} />
+                {[20, 50, 80].map((pct) => (
+                  <div
+                    key={pct}
+                    className="absolute top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full"
+                    style={{
+                      left: `${pct}%`,
+                      background: "#C9A96E",
+                      opacity: 0.35,
+                      boxShadow: "0 0 6px rgba(201,169,110,0.4)",
+                    }}
+                  />
                 ))}
               </motion.div>
             ))}
 
-            {/* ── Bottom bar ─────────────────────────────── */}
+            {/* Bottom Handle Bar */}
             <motion.div
               variants={slatVariants}
-              className="h-12 w-full flex items-center justify-between px-8"
-              style={{
-                background: "linear-gradient(180deg, #8F5820 0%, #7A4A1F 100%)",
-                borderTop: "2px solid rgba(0,0,0,0.25)",
-                boxShadow: "0 -8px 32px rgba(0,0,0,0.30)",
-              }}
+              className="h-14 w-full flex items-center justify-between px-8 bg-[#101010] border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.8)]"
             >
-              <div className="h-1 w-20 rounded-full bg-white/20" />
-              <span className="text-white/60 text-[9px] font-mono tracking-[0.25em] uppercase">
-                {pullProgress < 0.05  ? "↑ scroll to open"
-                : pullProgress < 0.5  ? "keep pulling..."
-                : pullProgress < 0.9  ? "almost there..."
-                : "release!"}
+              <div className="h-1 w-16 rounded-full bg-[#C9A96E]/20" />
+              <span className="text-[#C9A96E] text-[10px] font-mono tracking-[0.25em] uppercase font-bold">
+                {pullProgress < 0.05
+                  ? "SCROLL OR PULL TO UNVEIL"
+                  : pullProgress < 0.8
+                  ? "PULLING THE SHUTTER..."
+                  : "UNVEILING LOCARA"}
               </span>
-              <div className="h-1 w-20 rounded-full bg-white/20" />
+              <div className="h-1 w-16 rounded-full bg-[#C9A96E]/20" />
             </motion.div>
 
-            {/* ══════════════════════════════════════════════
-                ROPE + PULLEY — right side
-            ════════════════════════════════════════════════ */}
-            <div
-              className="fixed top-0 right-12 z-[110]"
-              style={{ pointerEvents: "none", width: 48, height: "100vh" }}
-            >
-              {/* Pulley wheel */}
-              <div className="absolute" style={{ top: ROPE_TOP - 20, left: "50%", transform: "translateX(-50%)", width: 32, height: 32 }}>
-                <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: 4, height: 16, background: "#6B3A15", borderRadius: 2 }} />
-                <div style={{ position: "absolute", top: 10, left: 0, width: 32, height: 32, borderRadius: "50%", background: "linear-gradient(145deg, #D4885A, #8F5820)", boxShadow: "0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#6B3A15" }} />
-                  <div style={{ position: "absolute", inset: 3, borderRadius: "50%", border: "2px solid rgba(0,0,0,0.20)" }} />
-                </div>
-              </div>
-
-              {/* Rope SVG */}
-              <svg style={{ position: "absolute", top: ROPE_TOP, left: 0, width: 48, overflow: "visible" }} height={Math.max(ringY - ROPE_TOP + 60, 60)}>
-                <defs>
-                  <pattern id="ropePattern" x="0" y="0" width="6" height="6" patternUnits="userSpaceOnUse">
-                    <rect width="6" height="6" fill="#8F5820" />
-                    <line x1="0" y1="0" x2="6" y2="6" stroke="#D4885A" strokeWidth="1.5" />
-                    <line x1="6" y1="0" x2="0" y2="6" stroke="#6B3A15" strokeWidth="0.8" />
-                  </pattern>
-                </defs>
-                <path
-                  d={`M 24 0 C ${24 + ropeSlack} ${(ringY - ROPE_TOP) * 0.25}, ${24 - ropeSlack} ${(ringY - ROPE_TOP) * 0.5}, ${24 + ropeSlack * 0.4} ${(ringY - ROPE_TOP) * 0.75}, 24 ${ringY - ROPE_TOP}`}
-                  stroke="url(#ropePattern)" strokeWidth={pullProgress > 0.3 ? 7 : 8} fill="none" strokeLinecap="round"
-                />
-                <path
-                  d={`M 24 0 C ${24 + ropeSlack * 0.6} ${(ringY - ROPE_TOP) * 0.25}, ${24 - ropeSlack * 0.6} ${(ringY - ROPE_TOP) * 0.5}, ${24 + ropeSlack * 0.2} ${(ringY - ROPE_TOP) * 0.75}, 24 ${ringY - ROPE_TOP}`}
-                  stroke="rgba(217,119,6,0.35)" strokeWidth={2} fill="none" strokeLinecap="round"
-                />
-              </svg>
-
-              {/* Ring handle */}
-              <div style={{ position: "absolute", top: ringY, left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                <div style={{ width: 14, height: 14, borderRadius: "50%", background: "linear-gradient(145deg, #D4885A, #8F5820)", boxShadow: "0 2px 4px rgba(0,0,0,0.4)" }} />
-                <div style={{ width: 36, height: 36, borderRadius: "50%", border: `4px solid ${pullProgress > 0.8 ? "#E8A868" : pullProgress > 0.4 ? "#D4885A" : "#8F5820"}`, background: "rgba(255,255,255,0.05)", boxShadow: pullProgress > 0.5 ? "0 0 16px rgba(212,136,90,0.55), 0 3px 8px rgba(0,0,0,0.35)" : "0 3px 8px rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", transition: "border-color 0.2s, box-shadow 0.2s" }}>
-                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: "rgba(255,255,255,0.15)" }} />
-                </div>
-                <div style={{ display: "flex", gap: 4 }}>
-                  {[0,1,2].map(j => <div key={j} style={{ width: 2, height: 12 + j * 3, borderRadius: 1, background: "#8F5820", opacity: 0.8 }} />)}
-                </div>
-              </div>
-
-              {/* Progress arc */}
-              <svg style={{ position: "absolute", top: ROPE_TOP - 8, left: "50%", transform: "translateX(-50%)", overflow: "visible" }} width={52} height={52}>
-                <circle cx={26} cy={26} r={22} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={3} />
-                <circle cx={26} cy={26} r={22} fill="none" stroke={pullProgress > 0.8 ? "#E8A868" : "#D4885A"} strokeWidth={3}
-                  strokeDasharray={`${pullProgress * 138} 138`} strokeLinecap="round"
-                  transform="rotate(-90 26 26)"
-                  style={{ transition: "stroke-dasharray 0.05s linear, stroke 0.2s" }} />
-              </svg>
-            </div>
-
-            {/* Idle instruction */}
-            {pullProgress < 0.05 && !isAnimating && (
+            {/* Center Unlock Prompt */}
+            {pullProgress < 0.1 && !isAnimating && (
               <motion.div
-                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                transition={{ delay: 1.2, duration: 0.6 }}
-                className="fixed inset-0 z-[105] flex flex-col items-center justify-center"
-                style={{ pointerEvents: "none" }}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[105] flex flex-col items-center justify-center pointer-events-none"
               >
-                <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                  className="flex flex-col items-center gap-4">
-                  <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.20)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-                      <path d="M12 20V4M12 4L6 10M12 4L18 10" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                <div className="flex flex-col items-center gap-4 text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-[#181818] border border-white/10 flex items-center justify-center shadow-glow-sm">
+                    <span className="text-2xl">🏛️</span>
                   </div>
-                  <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 10, fontFamily: "monospace", letterSpacing: "0.28em", textTransform: "uppercase", textShadow: "0 1px 8px rgba(0,0,0,0.5)" }}>
-OPEN THE MARKET             </div>
-                  {/* Skip button for development */}
+                  <div>
+                    <h2 className="font-serif text-2xl font-bold text-[#F5F5F5] tracking-wide">
+                      LOCARA
+                    </h2>
+                    <p className="text-xs uppercase font-mono tracking-[0.2em] text-[#C9A96E] mt-1">
+                      Unveiling The Heritage Treasure
+                    </p>
+                  </div>
                   <button
-                    onClick={() => {
-                      setIsAnimating(true);
-                      setTimeout(() => {
-                        setIsOpen(true);
-                        sessionStorage.setItem("shutter_opened", "true");
-                      }, 100);
-                    }}
-                    style={{
-                      pointerEvents: "auto",
-                      padding: "8px 16px",
-                      background: "rgba(255,255,255,0.2)",
-                      border: "1px solid rgba(255,255,255,0.3)",
-                      borderRadius: "4px",
-                      color: "white",
-                      fontSize: "12px",
-                      cursor: "pointer",
-                      marginTop: "10px"
-                    }}
+                    type="button"
+                    onClick={triggerOpen}
+                    className="pointer-events-auto mt-3 px-6 py-2.5 rounded-full bg-[#181818] border border-[#C9A96E]/40 text-[#C9A96E] hover:bg-[#C9A96E] hover:text-[#080808] font-bold text-xs uppercase tracking-wider transition-all duration-300 shadow-sm hover:shadow-glow"
                   >
-                    Skip Animation
+                    Enter Now →
                   </button>
-                </motion.div>
+                </div>
               </motion.div>
             )}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Content behind shutter */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: isOpen ? 1 : 0 }}
-        transition={{ delay: 0.6, duration: 1 }}
-        className="flex items-center justify-center min-h-screen p-4"
+        transition={{ delay: 0.4, duration: 0.8 }}
+        className="min-h-screen"
       >
         {children}
       </motion.div>

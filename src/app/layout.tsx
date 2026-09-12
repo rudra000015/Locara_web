@@ -2,46 +2,27 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import ThemeSync from '@/components/ui/ThemeSync';
 import LanguageSync from '@/components/ui/LanguageSync';
+import NoiseOverlay from '@/components/ui/NoiseOverlay';
+import CustomCursor from '@/components/ui/CustomCursor';
+import SmoothScroll from '@/components/ui/SmoothScroll';
 
 export const metadata: Metadata = {
-  title: 'Locara - Heritage Shop Discovery | Meerut',
-  description: 'Discover heritage shops of Meerut. Unveiling the local treasure with authentic shops, products, and traditions.',
-  keywords: 'heritage shops, Meerut, traditional products, local business, shop discovery',
-  authors: [{ name: 'Locara' }],
-  creator: 'Locara Team',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'),
+  title: 'Locara — Heritage Shop Discovery & Cultural Commerce',
+  description: 'Discover the most iconic heritage shops, artisanal crafts, and timeless local treasures.',
+  keywords: 'heritage shops, traditional craftsmanship, local markets, artisanal products, Meerut, Delhi',
+  authors: [{ name: 'Locara Studio' }],
+  creator: 'Locara',
   icons: {
     icon: '/favicon.svg',
-  },
-  manifest: '/manifest.json',
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'black-translucent',
-    startUrl: '/',
-    title: 'Locara',
-  },
-  formatDetection: {
-    telephone: true,
   },
   openGraph: {
     type: 'website',
     locale: 'en_US',
     url: 'https://locara.app',
     siteName: 'Locara',
-    title: 'Locara - Heritage Shop Discovery',
-    description: 'Discover heritage shops of Meerut',
-    images: [
-      {
-        url: 'https://locara.app/og-image.jpg',
-        width: 1200,
-        height: 630,
-        alt: 'Locara Heritage Shop Discovery',
-      },
-    ],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Locara - Heritage Shop Discovery',
-    description: 'Discover heritage shops of Meerut',
+    title: 'Locara — Heritage Shop Discovery',
+    description: 'Discover the most iconic heritage shops and traditional treasures.',
   },
 };
 
@@ -50,27 +31,20 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   userScalable: true,
-  themeColor: '#b87333',
+  themeColor: '#080808',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Locara" />
-        <meta name="application-name" content="Locara" />
-        <meta name="msapplication-TileColor" content="#b87333" />
-        <meta name="msapplication-config" content="/browserconfig.xml" />
         
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%23b87333' width='192' height='192'/></svg>" />
-        <link rel="manifest" href="/manifest.json" />
-        
         <link
           rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
@@ -79,24 +53,28 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
           href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         />
+        <script src="https://checkout.razorpay.com/v1/checkout.js" async></script>
         
-        {/* Preconnect to external domains */}
+        {/* Preconnect to external assets */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://api.dicebear.com" />
-        <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
-        <link rel="preconnect" href="https://unpkg.com" />
       </head>
-      <body suppressHydrationWarning className="antialiased">
+      <body suppressHydrationWarning className="bg-[#080808] text-[#F5F5F5] antialiased min-h-screen selection:bg-[#C9A96E]/20">
         <ThemeSync />
         <LanguageSync />
-        {children}
+        <NoiseOverlay />
+        <CustomCursor />
+        <SmoothScroll>
+          {children}
+        </SmoothScroll>
+
         {/* Service Worker Registration */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/sw.js').catch(() => {
-                  // Service worker registration failed, app will still work
-                });
+                navigator.serviceWorker.register('/sw.js').catch(() => {});
               }
             `,
           }}

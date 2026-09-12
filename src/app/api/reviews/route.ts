@@ -11,7 +11,9 @@ function computeStats(reviewDocs: any[]) {
 
   for (const r of reviewDocs) {
     const rating = r.rating || 0;
-    ratingBreakdown[rating] = (ratingBreakdown[rating] || 0) + 1;
+    if (rating >= 1 && rating <= 5) {
+      ratingBreakdown[rating as keyof typeof ratingBreakdown] = (ratingBreakdown[rating as keyof typeof ratingBreakdown] || 0) + 1;
+    }
     total += rating;
     (r.tags || []).forEach((tag: string) => {
       tagCounts[tag] = (tagCounts[tag] || 0) + 1;

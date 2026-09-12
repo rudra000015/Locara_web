@@ -3,75 +3,43 @@
 import { useState } from 'react';
 import { Review } from '@/types/review';
 import { useStore } from '@/store/useStore';
-
-const STAR_COLORS = ['', '#ef4444', '#f97316', '#f59e0b', '#22c55e', '#16a34a'];
-const TAG_POSITIVE = new Set([
-  'Fresh maal', 'Saste daam', 'Friendly staff',
-  'Quick service', 'Best in Meerut', 'Packaging acha', 'Revisit karunga',
-]);
+import { Star, ThumbsUp, MessageSquare, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   review: Review;
-  onHelpful: (id: string) => void;
+  onVoteHelpful?: (id: string) => void;
+  onHelpful?: (id: string) => void;
   isOwner?: boolean;
   onReply?: (id: string, text: string) => Promise<void>;
 }
 
-function Stars({ rating }: { rating: number }) {
-  return (
-    <div style={{ display: 'flex', gap: 2 }}>
-      {[1, 2, 3, 4, 5].map(n => (
-        <i
-          key={n}
-          className={`${n <= rating ? 'fas' : 'far'} fa-star`}
-          style={{ fontSize: 11, color: n <= rating ? STAR_COLORS[rating] : '#d1d5db' }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  const h = Math.floor(diff / 3600000);
-  const d = Math.floor(diff / 86400000);
-
-  if (m < 1) return 'Abhi';
-  if (m < 60) return `${m}m pehle`;
-  if (h < 24) return `${h}h pehle`;
-  if (d < 30) return `${d} din pehle`;
-
-  return new Date(iso).toLocaleDateString('hi-IN', {
-    day: 'numeric',
-    month: 'short',
-  });
-}
-
-export default function ReviewCard({ review: r, onHelpful, isOwner, onReply }: Props) {
+export default function ReviewCard({
+  review: r,
+  onVoteHelpful,
+  onHelpful,
+  isOwner,
+  onReply,
+}: Props) {
   const { user } = useStore();
-
-  // ✅ FIXED HERE
   const userId = user?.name ?? 'anon';
-
   const isMine = r.userId === userId;
-  const isHelpful = r.helpfulBy.includes(userId);
 
+  const [expanded, setExpanded] = useState(false);
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [replyText, setReplyText] = useState(r.ownerReply?.text ?? '');
   const [saving, setSaving] = useState(false);
-  const [expanded, setExpanded] = useState(false);
 
-  const BODY_LIMIT = 140;
+  const BODY_LIMIT = 160;
   const isLong = r.body.length > BODY_LIMIT;
+  const displayBody = isLong && !expanded ? r.body.slice(0, BODY_LIMIT) + '...' : r.body;
 
-  const displayBody = isLong && !expanded
-    ? r.body.slice(0, BODY_LIMIT) + '...'
-    : r.body;
+  const handleVote = () => {
+    if (onVoteHelpful) onVoteHelpful(r.id);
+    if (onHelpful) onHelpful(r.id);
+  };
 
   const handleSaveReply = async () => {
     if (!onReply || !replyText.trim()) return;
-
     setSaving(true);
     await onReply(r.id, replyText);
     setSaving(false);
@@ -79,105 +47,108 @@ export default function ReviewCard({ review: r, onHelpful, isOwner, onReply }: P
   };
 
   return (
-    <div
-      style={{
-        background: 'var(--bg-card)',
-        border: '1px solid var(--border)',
-        borderRadius: 18,
-        padding: '16px',
-        transition: 'box-shadow 0.2s',
-      }}
-    >
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
-        <div
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #8d5524, #b87333)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflow: 'hidden',
-          }}
-        >
-          {r.userImg ? (
-            <img
-              src={r.userImg}
-              alt={r.userName}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
-          ) : (
-            <span style={{ color: '#fff', fontSize: 14, fontWeight: 800 }}>
-              {r.userName.charAt(0).toUpperCase()}
-            </span>
-          )}
-        </div>
-
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontWeight: 800, fontSize: 14 }}>{r.userName}</span>
-
-            {isMine && (
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  background: 'rgba(141,85,36,0.12)',
-                  color: '#8d5524',
-                  padding: '1px 7px',
-                  borderRadius: 100,
-                }}
-              >
-                Aapka
+    <div className="p-5 rounded-2xl bg-[#121212] border border-white/[0.08] shadow-sm hover:border-white/[0.14] transition-all">
+      {/* User Header */}
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-[#1C1C1C] border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
+            {r.userImg ? (
+              <img src={r.userImg} alt={r.userName} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-xs font-bold text-[#C9A96E]">
+                {r.userName.charAt(0).toUpperCase()}
               </span>
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
-            <Stars rating={r.rating} />
-            <span style={{ fontSize: 11, color: 'var(--fg-faint)' }}>
-              {timeAgo(r.createdAt)}
-            </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-sm text-[#F5F5F5]">{r.userName}</span>
+              {isMine && (
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#C9A96E]/15 text-[#C9A96E] border border-[#C9A96E]/25">
+                  You
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 mt-0.5">
+              <div className="flex text-[#C9A96E]">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star
+                    key={i}
+                    className={`w-3 h-3 ${
+                      i < r.rating ? 'fill-[#C9A96E] text-[#C9A96E]' : 'text-white/20'
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className="text-[10px] font-mono text-[#71717A]">
+                {new Date(r.createdAt).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Body */}
-      <p style={{ fontSize: 13, lineHeight: 1.65 }}>
+      {/* Review Body */}
+      <p className="text-xs sm:text-sm text-[#A1A1AA] leading-relaxed mb-3">
         {displayBody}
         {isLong && (
           <button
             onClick={() => setExpanded(!expanded)}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: '#8d5524',
-              fontSize: 12,
-              fontWeight: 700,
-              paddingLeft: 4,
-            }}
+            className="text-[#C9A96E] font-bold ml-1.5 hover:underline"
           >
-            {expanded ? 'Kam karo' : 'Aur padho'}
+            {expanded ? 'Show less' : 'Read more'}
           </button>
         )}
       </p>
 
-      {/* Footer */}
-      <button
-        onClick={() => onHelpful(r.id)}
-        style={{
-          marginTop: 10,
-          padding: '6px 12px',
-          borderRadius: 10,
-          border: '1px solid var(--border)',
-          cursor: 'pointer',
-        }}
-      >
-        Helpful {r.helpful > 0 && `(${r.helpful})`}
-      </button>
+      {/* Tags */}
+      {r.tags && r.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {r.tags.map((tag, idx) => (
+            <span
+              key={idx}
+              className="px-2.5 py-0.5 rounded-md bg-white/5 text-[10px] text-[#71717A] border border-white/5"
+            >
+              ✓ {tag}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Helpful Action */}
+      <div className="flex items-center justify-between pt-3 border-t border-white/5">
+        <button
+          type="button"
+          onClick={handleVote}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#181818] hover:bg-[#202020] border border-white/10 text-xs font-bold text-[#A1A1AA] hover:text-[#F5F5F5] transition-all cursor-pointer"
+        >
+          <ThumbsUp className="w-3.5 h-3.5 text-[#C9A96E]" />
+          <span>Helpful {r.helpful ? `(${r.helpful})` : ''}</span>
+        </button>
+
+        {isOwner && !r.ownerReply && (
+          <button
+            onClick={() => setShowReplyBox(!showReplyBox)}
+            className="text-xs font-bold text-[#C9A96E] hover:underline"
+          >
+            Reply to customer
+          </button>
+        )}
+      </div>
+
+      {/* Owner Reply */}
+      {r.ownerReply && (
+        <div className="mt-3 p-3.5 rounded-xl bg-[#181818] border-l-2 border-[#C9A96E] text-xs">
+          <p className="font-bold text-[#C9A96E] mb-1">Response from Store Owner</p>
+          <p className="text-[#A1A1AA]">{r.ownerReply.text}</p>
+        </div>
+      )}
     </div>
   );
 }

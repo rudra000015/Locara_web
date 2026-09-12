@@ -10,11 +10,14 @@ export async function GET() {
 
   if (!publicKey) {
     return NextResponse.json(
-      { error: 'Missing VAPID public key. Set NEXT_PUBLIC_VAPID_PUBLIC_KEY in .env.local.' },
-      { status: 500 }
+      {
+        enabled: false,
+        publicKey: null,
+        message: 'Push notifications are disabled. Set NEXT_PUBLIC_VAPID_PUBLIC_KEY in .env.local.',
+      },
+      { status: 200 }
     );
   }
 
-  return NextResponse.json({ publicKey }, { status: 200 });
+  return NextResponse.json({ enabled: true, publicKey }, { status: 200 });
 }
-

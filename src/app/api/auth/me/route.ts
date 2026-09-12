@@ -1,29 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDb } from "@/lib/mongodb";
 import { User } from "@/models/User";
-import { requireAuth } from "@/middleware/auth";
+import { extractBearerToken, verifyAuthToken } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   try {
-    const payload = requireAuth(request);
-
-    if (!(payload as any)?.id) {
+    const token = extractBearerToken(request);
+    if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const payload = verifyAuthToken(token);
     await connectDb();
 
-    const user = await User.findById(payload.id).select("-password");
+    const user = await User.findById(payload.id).lean();
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ user });
+    return NextResponse.json({
+      user: {
+        id: String(user._id),
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        img: user.img,
+      },
+    });
   } catch (error) {
-    console.error("Auth me error", error);
-    if (error instanceof NextResponse) {
-      return error;
-    }
-    return NextResponse.json({ error: "Unable to fetch authenticated user" }, { status: 500 });
+    return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
   }
 }

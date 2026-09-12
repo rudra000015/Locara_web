@@ -1,129 +1,85 @@
-// src/app/api/visual-search/route.ts
-// Google Lens-style visual search — uses Claude Vision to identify
-// the product in an uploaded image, then searches shops for matches
-// FREE — uses your existing Anthropic API key
-
 import { NextRequest, NextResponse } from 'next/server';
+import { visualSearchService } from '@/services/visualSearchService';
+import { shopMatchingService } from '@/services/shopMatchingService';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
+    const contentType = req.headers.get('content-type') || '';
+    let image: string | undefined;
+    let textQuery: string | undefined;
+    let userLat: number | undefined;
+    let userLng: number | undefined;
+    let radiusMeters: number | undefined;
+    let category: string | undefined;
+    let maxPrice: number | undefined;
+    let minPrice: number | undefined;
+
+    if (contentType.includes('application/json')) {
+      const body = await req.json();
+      image = body.image;
+      textQuery = body.textQuery;
+      if (body.lat !== undefined) userLat = parseFloat(body.lat);
+      if (body.lng !== undefined) userLng = parseFloat(body.lng);
+      if (body.radius !== undefined) radiusMeters = parseInt(body.radius, 10);
+      category = body.category;
+      if (body.maxPrice !== undefined) maxPrice = parseFloat(body.maxPrice);
+      if (body.minPrice !== undefined) minPrice = parseFloat(body.minPrice);
+    } else if (contentType.includes('multipart/form-data')) {
+      const formData = await req.formData();
+      const file = formData.get('image') as File | null;
+      if (file) {
+        const bytes = await file.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+        const base64 = buffer.toString('base64');
+        const mimeType = file.type || 'image/jpeg';
+        image = `data:${mimeType};base64,${base64}`;
+      }
+      textQuery = (formData.get('textQuery') as string) || undefined;
+      const latVal = formData.get('lat') as string;
+      const lngVal = formData.get('lng') as string;
+      if (latVal) userLat = parseFloat(latVal);
+      if (lngVal) userLng = parseFloat(lngVal);
+      category = (formData.get('category') as string) || undefined;
+    }
+
+    if (!image && !textQuery) {
       return NextResponse.json(
-        { error: 'Missing ANTHROPIC_API_KEY in .env.local' },
+        { error: 'Please upload an image or provide a search query.' },
         { status: 400 }
       );
     }
 
-    const formData = await req.formData();
-    const imageFile = formData.get('image') as File | null;
-    const imageUrl  = formData.get('imageUrl') as string | null;
+    const { results, queryType, model, version, totalMatched } =
+      await visualSearchService.executeVisualSearch({
+        image,
+        textQuery,
+        userLat,
+        userLng,
+        radiusMeters,
+        category,
+        maxPrice,
+        minPrice,
+        limit: 25,
+      });
 
-    if (!imageFile && !imageUrl) {
-      return NextResponse.json({ error: 'No image provided' }, { status: 400 });
-    }
-
-    // Convert image to base64
-    let base64Data = '';
-    let mediaType  = 'image/jpeg';
-
-    if (imageFile) {
-      const buffer = await imageFile.arrayBuffer();
-      base64Data   = Buffer.from(buffer).toString('base64');
-      mediaType    = imageFile.type || 'image/jpeg';
-    } else if (imageUrl) {
-      // Fetch from URL
-      const imgRes = await fetch(imageUrl);
-      const buffer = await imgRes.arrayBuffer();
-      base64Data   = Buffer.from(buffer).toString('base64');
-      mediaType    = imgRes.headers.get('content-type') || 'image/jpeg';
-    }
-
-    // Call Claude Vision to identify the product
-    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 400,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image',
-                source: {
-                  type: 'base64',
-                  media_type: mediaType,
-                  data: base64Data,
-                },
-              },
-              {
-                type: 'text',
-                text: `You are a product identification assistant for an Indian heritage shop app in Meerut, UP.
-
-Look at this image and identify what product, food item, or category it shows.
-
-Respond with ONLY a JSON object (no markdown, no explanation):
-{
-  "productName": "English name of the product",
-  "productNameHindi": "Hindi name if applicable",
-  "category": "one of: sweets, namkeen, grocery, dairy, bakery, spices, pharmacy, puja, seasonal, dry-fruits, beverages, general",
-  "searchKeywords": ["keyword1", "keyword2", "keyword3"],
-  "confidence": "high | medium | low",
-  "description": "one sentence describing what you see"
-}
-
-If the image is not a product (e.g. a person, landscape, etc.), set category to "general" and confidence to "low".`,
-              },
-            ],
-          },
-        ],
-      }),
-    });
-
-    if (!claudeRes.ok) {
-      const err = await claudeRes.text();
-      console.error('[visual-search] Claude API error:', err);
-      return NextResponse.json({ error: 'Vision API failed' }, { status: 500 });
-    }
-
-    const claudeData = await claudeRes.json();
-    const textContent = claudeData.content?.find((c: any) => c.type === 'text')?.text ?? '{}';
-
-    // Parse Claude's JSON response
-    let identified: any = {};
-    try {
-      identified = JSON.parse(textContent.replace(/```json|```/g, '').trim());
-    } catch {
-      identified = {
-        productName: 'Unknown product',
-        category: 'general',
-        searchKeywords: [],
-        confidence: 'low',
-        description: 'Could not identify product',
-      };
-    }
-
-    // Now search Overpass for matching shops
-    const { searchNearbyShops, textSearchShops } = await import('@/lib/overpass');
-
-    const searchTerm = [identified.productName, ...(identified.searchKeywords ?? [])].join(' ');
-    const shops = await textSearchShops(searchTerm + ' Meerut', 28.9845, 77.7064, 5000)
-      .catch(() => []);
+    const shopClusters = shopMatchingService.clusterMatchesByShop(results);
 
     return NextResponse.json({
-      identified,
-      shops,
-      searchTerm,
+      success: true,
+      queryType,
+      model,
+      version,
+      totalMatched,
+      results,
+      shopClusters,
     });
-
   } catch (err: any) {
-    console.error('[visual-search]', err.message);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('[POST /api/visual-search]', err?.message || err);
+    return NextResponse.json(
+      { error: err?.message || 'Visual search failed' },
+      { status: 500 }
+    );
   }
 }

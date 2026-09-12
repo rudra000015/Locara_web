@@ -1,390 +1,160 @@
 'use client';
- 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
- 
-/* ══════════════════════════════════════════════════════════
-   TYPES
-══════════════════════════════════════════════════════════ */
+
+import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Sparkles, Clock, ArrowRight, Tag } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+
 interface DealCard {
   id: string;
-  badge: string;        // e.g. "⚡ FLASH SALE"
-  badgeBg: string;      // pill background
+  badge: string;
   shopName: string;
   description: string;
-  icon: string;         // emoji
-  iconBg: string;       // circle bg
+  icon: string;
   mrp?: number;
   price: number;
-  discountLabel?: string; // "25% off"
-  freeShip?: boolean;
-  countdown?: number;   // seconds remaining, if any
+  discountLabel?: string;
   tags?: string[];
-  cardBg: string;       // card gradient
-  accentColor: string;  // for blobs / rings
-  corner?: string;      // corner ribbon text e.g. "NEW"
-  cornerBg?: string;
 }
- 
-/* ══════════════════════════════════════════════════════════
-   MOCK DATA — 6 cards matching the screenshot palette
-══════════════════════════════════════════════════════════ */
+
 const DEALS: DealCard[] = [
   {
     id: 'd1',
-    badge: '⚡ FLASH SALE',
-    badgeBg: 'linear-gradient(90deg,#e91e8c,#ff5252)',
+    badge: 'HERITAGE FLASH SALE',
     shopName: 'Agarwal Sweets',
-    description: 'Kaju Barfi & Gulab Jamun',
+    description: 'Kaju Katli & Royal Gulab Jamun Box',
     icon: '🍬',
-    iconBg: '#fce4ec',
-    mrp: 489, price: 360,
-    discountLabel: '25% off',
-    countdown: 3 * 3600 + 38 * 60 + 37,
-    tags: ['Sweets', 'Diwali'],
-    cardBg: 'linear-gradient(145deg,#fff0f5 0%,#ffe4ef 100%)',
-    accentColor: '#f48fb1',
+    mrp: 489,
+    price: 360,
+    discountLabel: '25% OFF',
+    tags: ['Pure Desi Ghee', 'Limited Batch'],
   },
   {
     id: 'd2',
-    badge: '🔥 DEAL OF THE DAY',
-    badgeBg: 'linear-gradient(90deg,#ff6f00,#ffc107)',
+    badge: 'CRAFTSMAN SPECIAL',
     shopName: 'Ram Lal Halwai',
-    description: 'Gajak & Rewri combo',
+    description: 'Special Gur Gajak & Til Rewri Combo',
     icon: '🥜',
-    iconBg: '#fff8e1',
-    mrp: 220, price: 149,
-    discountLabel: '32% off',
-    countdown: 3 * 3600 + 33 * 60 + 20,
-    tags: ['Seasonal', 'Namkeen'],
-    cardBg: 'linear-gradient(145deg,#fffde7 0%,#fff3cd 100%)',
-    accentColor: '#ffd54f',
+    mrp: 240,
+    price: 169,
+    discountLabel: '30% OFF',
+    tags: ['Winter Heritage', 'Organic Jaggery'],
   },
   {
     id: 'd3',
-    badge: '✨ NEW ARRIVAL',
-    badgeBg: 'linear-gradient(90deg,#00897b,#26a69a)',
-    shopName: 'Shri Durga Spices',
-    description: 'Homemade Masala range',
-    icon: '🌶️',
-    iconBg: '#e8f5e9',
-    price: 199,
-    tags: ['Spices', 'Organic'],
-    cardBg: 'linear-gradient(145deg,#e8f5e9 0%,#c8e6c9 100%)',
-    accentColor: '#81c784',
-    corner: 'NEW',
-    cornerBg: 'linear-gradient(135deg,#00897b,#26a69a)',
-  },
-  {
-    id: 'd4',
-    badge: '🎁 COMBO DEAL',
-    badgeBg: 'linear-gradient(90deg,#7b1fa2,#ab47bc)',
-    shopName: 'Sharma Kirana',
-    description: 'Ghee + Dal + Basmati',
-    icon: '🧺',
-    iconBg: '#f3e5f5',
-    mrp: 920, price: 699,
-    discountLabel: '₹221 off',
-    tags: ['Grocery'],
-    cardBg: 'linear-gradient(145deg,#f3e5f5 0%,#e1bee7 100%)',
-    accentColor: '#ce93d8',
-  },
-  {
-    id: 'd5',
-    badge: '🚀 FREE DELIVERY',
-    badgeBg: 'linear-gradient(90deg,#e64a19,#ff7043)',
-    shopName: 'Goyal Dry Fruits',
-    description: 'Kaju Kismis premium',
-    icon: '🥜',
-    iconBg: '#fbe9e7',
-    price: 349,
-    freeShip: true,
-    tags: ['Dry Fruits'],
-    cardBg: 'linear-gradient(145deg,#fff8f5 0%,#ffe8e0 100%)',
-    accentColor: '#ff8a65',
-    corner: 'NEW',
-    cornerBg: 'linear-gradient(135deg,#e64a19,#ff7043)',
-  },
-  {
-    id: 'd6',
-    badge: '⏳ LIMITED STOCK',
-    badgeBg: 'linear-gradient(90deg,#1565c0,#42a5f5)',
-    shopName: 'Puja Corner',
-    description: 'Diwali puja thali set',
-    icon: '🪔',
-    iconBg: '#e3f2fd',
-    mrp: 380, price: 299,
-    discountLabel: '21% off',
-    tags: ['Puja'],
-    cardBg: 'linear-gradient(145deg,#e3f2fd 0%,#bbdefb 100%)',
-    accentColor: '#64b5f6',
+    badge: 'ARTISANAL WEAVE',
+    shopName: 'Kashi Silk House',
+    description: 'Handcrafted Banarasi Silk Dupatta',
+    icon: '🥻',
+    mrp: 1850,
+    price: 1399,
+    discountLabel: '24% OFF',
+    tags: ['Zari Work', 'Certified Heritage'],
   },
 ];
- 
-/* ══════════════════════════════════════════════════════════
-   COUNTDOWN HOOK
-══════════════════════════════════════════════════════════ */
-function useCountdown(initial?: number) {
-  const [secs, setSecs] = useState(initial ?? 0);
+
+export default function OfferBanner() {
+  const router = useRouter();
+  const [timeLeft, setTimeLeft] = useState(3 * 3600 + 42 * 60 + 15);
+
   useEffect(() => {
-    if (!initial) return;
-    const t = setInterval(() => setSecs(s => (s > 0 ? s - 1 : 0)), 1000);
-    return () => clearInterval(t);
-  }, [initial]);
- 
-  const hh = String(Math.floor(secs / 3600)).padStart(2, '0');
-  const mm = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
-  const ss = String(secs % 60).padStart(2, '0');
-  return `${hh}:${mm}:${ss}`;
-}
- 
-/* ══════════════════════════════════════════════════════════
-   SINGLE DEAL CARD
-══════════════════════════════════════════════════════════ */
-function DealCardComponent({ card, index }: { card: DealCard; index: number }) {
-  const timer = useCountdown(card.countdown);
- 
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTime = (secs: number) => {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20, scale: 0.94 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ delay: index * 0.07, duration: 0.4, ease: [0.34, 1.56, 0.64, 1] }}
-      whileHover={{ y: -5, scale: 1.02, transition: { duration: 0.2 } }}
-      whileTap={{ scale: 0.97 }}
-      style={{
-        background: card.cardBg,
-        borderRadius: 20,
-        padding: '14px 14px 16px',
-        position: 'relative',
-        overflow: 'hidden',
-        cursor: 'pointer',
-        border: '1px solid rgba(255,255,255,0.8)',
-        boxShadow: `0 4px 20px ${card.accentColor}33, 0 1px 4px rgba(0,0,0,0.06)`,
-      }}
-    >
-      {/* Decorative blob — bottom right */}
-      <div style={{
-        position: 'absolute', bottom: -22, right: -22,
-        width: 88, height: 88, borderRadius: '50%',
-        background: card.accentColor, opacity: 0.18,
-        pointerEvents: 'none',
-      }} />
-      {/* Decorative blob — top left faint */}
-      <div style={{
-        position: 'absolute', top: -16, left: -16,
-        width: 60, height: 60, borderRadius: '50%',
-        background: card.accentColor, opacity: 0.10,
-        pointerEvents: 'none',
-      }} />
- 
-      {/* Corner ribbon */}
-      {card.corner && (
-        <div style={{
-          position: 'absolute', top: 0, right: 0,
-          background: card.cornerBg,
-          color: '#fff', fontSize: 8, fontWeight: 900,
-          padding: '4px 10px 4px 14px',
-          borderBottomLeftRadius: 12,
-          letterSpacing: '0.08em',
-        }}>
-          {card.corner}
+    <div className="mb-8">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3.5">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-lg bg-[#C9A96E]/15 border border-[#C9A96E]/30 flex items-center justify-center">
+            <Tag className="w-3.5 h-3.5 text-[#C9A96E]" />
+          </div>
+          <h2 className="font-serif font-bold text-base sm:text-lg text-[#F5F5F5]">
+            Curated Heritage Deals
+          </h2>
         </div>
-      )}
- 
-      {/* Badge pill */}
-      <div style={{
-        display: 'inline-flex', alignItems: 'center', gap: 5,
-        background: card.badgeBg,
-        borderRadius: 99, padding: '4px 10px',
-        fontSize: 9, fontWeight: 900, color: '#fff',
-        letterSpacing: '0.06em', marginBottom: 10,
-        boxShadow: `0 2px 8px ${card.accentColor}55`,
-      }}>
-        {card.badge}
-      </div>
- 
-      {/* Icon circle + shop info row */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
-        {/* Animated icon */}
-        <motion.div
-          animate={{ rotate: [0, 8, -8, 0], scale: [1, 1.08, 1] }}
-          transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut', delay: index * 0.3 }}
-          style={{
-            width: 48, height: 48, borderRadius: '50%',
-            background: card.iconBg,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 22, flexShrink: 0,
-            boxShadow: `0 2px 10px ${card.accentColor}44`,
-            border: `2px solid rgba(255,255,255,0.7)`,
-          }}
-        >
-          {card.icon}
-        </motion.div>
- 
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontWeight: 800, fontSize: 13, color: '#1a1a1a', marginBottom: 1, lineHeight: 1.2 }}>
-            {card.shopName}
-          </p>
-          <p style={{ fontSize: 11, color: '#555', lineHeight: 1.3 }}>
-            {card.description}
-          </p>
+
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#161616] border border-white/10 text-xs font-mono text-[#C9A96E]">
+          <Clock className="w-3.5 h-3.5 animate-pulse" />
+          <span>Ends in {formatTime(timeLeft)}</span>
         </div>
       </div>
- 
-      {/* Price row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: card.countdown ? 6 : 10, flexWrap: 'wrap' }}>
-        {card.mrp && (
-          <span style={{ fontSize: 11, textDecoration: 'line-through', color: '#999' }}>₹{card.mrp}</span>
-        )}
-        <span style={{ fontSize: 18, fontWeight: 900, color: '#1a1a1a', fontFamily: "'Baloo 2',cursive" }}>
-          ₹{card.price}
-        </span>
-        {card.discountLabel && (
-          <motion.span
-            animate={{ scale: [1, 1.06, 1] }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut', delay: index * 0.2 }}
-            style={{
-              background: 'linear-gradient(135deg,#e53935,#ff7043)',
-              color: '#fff', fontSize: 9, fontWeight: 900,
-              padding: '3px 8px', borderRadius: 99,
-              boxShadow: '0 2px 6px rgba(229,57,53,0.35)',
-            }}
+
+      {/* Cards Scroll */}
+      <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+        {DEALS.map((deal, idx) => (
+          <motion.div
+            key={deal.id}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: idx * 0.08, duration: 0.4 }}
+            className="w-72 sm:w-80 shrink-0 p-4 rounded-2xl bg-[#121212] hover:bg-[#161616] border border-white/[0.08] hover:border-white/[0.18] transition-all duration-300 shadow-sm flex flex-col justify-between group"
           >
-            {card.discountLabel}
-          </motion.span>
-        )}
-        {card.freeShip && (
-          <span style={{
-            background: 'linear-gradient(135deg,#2e7d32,#43a047)',
-            color: '#fff', fontSize: 9, fontWeight: 900,
-            padding: '3px 8px', borderRadius: 99,
-          }}>
-            Free ship
-          </span>
-        )}
-      </div>
- 
-      {/* Countdown timer */}
-      {card.countdown !== undefined && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
-          <span style={{ fontSize: 10, color: '#888', fontWeight: 600 }}>Ends</span>
-          <motion.span
-            animate={{ opacity: [1, 0.6, 1] }}
-            transition={{ duration: 1, repeat: Infinity }}
-            style={{
-              fontSize: 13, fontWeight: 900, color: '#1a1a1a',
-              fontFamily: 'monospace', letterSpacing: '0.05em',
-              background: 'rgba(0,0,0,0.06)',
-              padding: '2px 8px', borderRadius: 6,
-            }}
-          >
-            {timer}
-          </motion.span>
-        </div>
-      )}
- 
-      {/* Tags */}
-      {card.tags && card.tags.length > 0 && (
-        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-          {card.tags.map(tag => (
-            <span key={tag} style={{
-              fontSize: 9, fontWeight: 700,
-              padding: '3px 9px', borderRadius: 99,
-              background: 'rgba(0,0,0,0.07)',
-              color: '#444',
-            }}>
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
-    </motion.div>
-  );
-}
- 
-/* ══════════════════════════════════════════════════════════
-   TICKER (scrolling marquee at top)
-══════════════════════════════════════════════════════════ */
-function Ticker() {
-  const items = [
-    '🎉 Diwali Special — Assorted Sweets ✦',
-    '🌟 Namkeen Box — New Flavours In ✦',
-    '🔥 Flash Sale — Up to 40% off ✦',
-    '🎁 Free Delivery on orders above ₹299 ✦',
-    '⭐ New Arrivals every Friday ✦',
-  ];
-  const text = items.join('   ');
- 
-  return (
-    <div style={{
-      background: 'linear-gradient(90deg,#1B4332,#2D6A4F)',
-      overflow: 'hidden',
-      borderRadius: '14px 14px 0 0',
-      padding: '7px 0',
-      position: 'relative',
-    }}>
-      <motion.div
-        animate={{ x: [0, -1200] }}
-        transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
-        style={{
-          display: 'flex', gap: 40,
-          whiteSpace: 'nowrap',
-          fontSize: 11, fontWeight: 700, color: '#fff',
-          paddingLeft: 16,
-        }}
-      >
-        {[text, text, text].map((t, i) => (
-          <span key={i}>{t}</span>
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold tracking-wider uppercase bg-[#C9A96E]/15 text-[#C9A96E] border border-[#C9A96E]/20">
+                  {deal.badge}
+                </span>
+                <span className="text-[10px] font-bold text-[#22c55e] bg-[#22c55e]/10 px-2 py-0.5 rounded-full border border-[#22c55e]/20">
+                  {deal.discountLabel}
+                </span>
+              </div>
+
+              <div className="flex items-start gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-[#1C1C1C] border border-white/5 flex items-center justify-center text-xl shrink-0">
+                  {deal.icon}
+                </div>
+                <div>
+                  <h3 className="font-serif font-bold text-sm text-[#F5F5F5] group-hover:text-[#C9A96E] transition-colors leading-tight">
+                    {deal.shopName}
+                  </h3>
+                  <p className="text-xs text-[#A1A1AA] line-clamp-1 mt-0.5">{deal.description}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-1 mb-4">
+                {deal.tags?.map((tag) => (
+                  <span
+                    key={tag}
+                    className="px-2 py-0.5 rounded-md bg-white/5 text-[10px] text-[#71717A] border border-white/5"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-3 border-t border-white/5">
+              <div className="flex items-baseline gap-1.5 font-mono">
+                <span className="text-base font-bold text-[#C9A96E]">
+                  ₹{deal.price.toLocaleString('en-IN')}
+                </span>
+                {deal.mrp && (
+                  <span className="text-xs text-[#71717A] line-through">₹{deal.mrp}</span>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => router.push('/explorer')}
+                className="flex items-center gap-1 text-xs font-bold text-[#F5F5F5] group-hover:text-[#C9A96E] transition-colors"
+              >
+                Claim Deal <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            </div>
+          </motion.div>
         ))}
-      </motion.div>
+      </div>
     </div>
   );
 }
- 
-/* ══════════════════════════════════════════════════════════
-   MAIN EXPORT — OfferBanner
-   Drop this wherever OfferBanner is imported in HomePage
-══════════════════════════════════════════════════════════ */
-export default function OfferBanner() {
-  const [visible, setVisible] = useState(true);
- 
-  if (!visible) return null;
- 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45 }}
-      style={{ marginBottom: 24, borderRadius: 16, overflow: 'hidden' }}
-    >
-      {/* Scrolling ticker */}
-      <Ticker />
- 
-      {/* Cards grid */}
-      <div style={{
-        background: 'rgba(255,255,255,0.6)',
-        backdropFilter: 'blur(8px)',
-        padding: '14px 12px',
-        borderRadius: '0 0 16px 16px',
-        border: '1px solid rgba(201,151,58,0.15)',
-        borderTop: 'none',
-      }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-          gap: 12,
-        }}>
-          {DEALS.map((card, i) => (
-            <DealCardComponent key={card.id} card={card} index={i} />
-          ))}
-        </div>
-      </div>
-    </motion.div>
-  );
-}
- 
-/* ══════════════════════════════════════════════════════════
-   Also export individual card for use elsewhere
-══════════════════════════════════════════════════════════ */
-export { DealCardComponent, DEALS };
-export type { DealCard };

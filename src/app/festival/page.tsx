@@ -11,6 +11,7 @@ import { DEFAULT_FILTERS } from '@/data/categories';
 export default function FestivalsPage() {
   const router = useRouter();
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [selectedCity, setSelectedCity] = useState('Meerut');
  
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
@@ -21,9 +22,12 @@ export default function FestivalsPage() {
         onFiltersChange={setFilters}
         totalResults={0}
         onRefetch={() => {}}
+        selectedCity={selectedCity}
+        onCityChange={setSelectedCity}
+        onUseGps={() => setSelectedCity('Meerut')}
       />
       <main className="max-w-2xl mx-auto px-4 pt-6 pb-28">
-        <FestivalHub onNavigate={(slug) => router.push(`/festival/${slug}`)} />
+        <FestivalHub onNavigate={(slug: string) => router.push(`/festival/${slug}`)} />
       </main>
       <ExplorerNav />
     </div>

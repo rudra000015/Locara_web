@@ -1,205 +1,88 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { FESTIVALS, Festival, getTimeUntilFestival, getActiveFestivals } from '@/data/festivals';
+import { useRouter } from 'next/navigation';
+import { FESTIVALS, getActiveFestivals } from '@/data/festivals';
+import { Sparkles, Calendar, ArrowRight, Store } from 'lucide-react';
+import FadeIn from '@/components/motion/FadeIn';
 
-// ── Mini countdown for cards ──────────────────────────────────
-function MiniCountdown({ festival }: { festival: Festival }) {
-  const [t, setT] = useState(getTimeUntilFestival(festival));
-  useEffect(() => {
-    const id = setInterval(() => setT(getTimeUntilFestival(festival)), 1000);
-    return () => clearInterval(id);
-  }, [festival]);
-
-  if (t.expired) return (
-    <span style={{ color: '#34d399', fontSize: 11, fontWeight: 700 }}>🎉 Aaj hai!</span>
-  );
-
-  return (
-    <span style={{
-      fontFamily: "'JetBrains Mono',monospace",
-      fontSize: 11, fontWeight: 700,
-      color: festival.theme.accent,
-    }}>
-      {t.days > 0 ? `${t.days}d ` : ''}{String(t.hours).padStart(2,'0')}:{String(t.minutes).padStart(2,'0')}:{String(t.seconds).padStart(2,'0')}
-    </span>
-  );
+interface FestivalHubProps {
+  onNavigate?: (slug: string) => void;
 }
 
-// ── Festival teaser card ──────────────────────────────────────
-function FestivalCard({ festival, onOpen }: {
-  festival: Festival;
-  onOpen: (slug: string) => void;
-}) {
-  const active = getActiveFestivals().some(f => f.id === festival.id);
-  const maxDiscount = Math.max(...festival.offers.map(o => o.discount));
+export default function FestivalHub({ onNavigate }: FestivalHubProps) {
+  const router = useRouter();
+  const activeList = getActiveFestivals();
+
+  const handleSelect = (slug: string) => {
+    if (onNavigate) {
+      onNavigate(slug);
+    } else {
+      router.push(`/festival/${slug}`);
+    }
+  };
 
   return (
-    <div
-      onClick={() => onOpen(festival.slug)}
-      style={{
-        borderRadius: 20,
-        overflow: 'hidden',
-        cursor: 'pointer',
-        position: 'relative',
-        transition: 'transform 0.25s ease, box-shadow 0.25s ease',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-      }}
-      onMouseEnter={e => {
-        (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-6px)';
-        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 16px 48px rgba(0,0,0,0.3)';
-      }}
-      onMouseLeave={e => {
-        (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
-        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 8px 32px rgba(0,0,0,0.2)';
-      }}
-    >
-      {/* Background */}
-      <div style={{ background: festival.theme.bg, padding: '24px 20px 20px' }}>
-
-        {/* Active badge */}
-        {active && (
-          <div style={{
-            position: 'absolute', top: 12, right: 12,
-            background: '#34d399', color: '#064e3b',
-            fontSize: 9, fontWeight: 800,
-            padding: '3px 8px', borderRadius: 100,
-            textTransform: 'uppercase', letterSpacing: '0.1em',
-          }}>
-            ● Live Now
-          </div>
-        )}
-
-        {/* Emoji + Name */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
-          <div style={{ fontSize: 48, lineHeight: 1, filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))' }}>
-            {festival.emoji}
-          </div>
-          <div>
-            <h3 style={{
-              fontFamily: "'Baloo 2',cursive",
-              fontSize: 26, fontWeight: 900,
-              color: '#fff', lineHeight: 1, marginBottom: 3,
-            }}>
-              {festival.nameHindi}
-            </h3>
-            <p style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.65)', lineHeight: 1.3 }}>
-              {festival.tagline}
-            </p>
-          </div>
-        </div>
-
-        {/* Stats row */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-          <span style={{
-            background: `${festival.theme.accent}25`,
-            border: `1px solid ${festival.theme.accent}50`,
-            color: festival.theme.accent,
-            fontSize: 11, fontWeight: 800,
-            padding: '4px 10px', borderRadius: 100,
-          }}>
-            Up to {maxDiscount}% off
-          </span>
-          <span style={{
-            background: 'rgba(255,255,255,0.1)',
-            color: 'rgba(255,255,255,0.7)',
-            fontSize: 11, fontWeight: 700,
-            padding: '4px 10px', borderRadius: 100,
-          }}>
-            {festival.offers.length} shops
-          </span>
-          <span style={{
-            background: 'rgba(255,255,255,0.1)',
-            color: 'rgba(255,255,255,0.7)',
-            fontSize: 11, fontWeight: 700,
-            padding: '4px 10px', borderRadius: 100,
-          }}>
-            Meerut
-          </span>
-        </div>
-
-        {/* Countdown + CTA row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>
-              {festival.nameHindi} mein
-            </p>
-            <MiniCountdown festival={festival} />
-          </div>
-          <button style={{
-            background: festival.theme.accent,
-            color: '#1a0000',
-            border: 'none', cursor: 'pointer',
-            borderRadius: 12, padding: '10px 18px',
-            fontFamily: "'Baloo 2',cursive",
-            fontSize: 13, fontWeight: 800,
-            display: 'flex', alignItems: 'center', gap: 6,
-            transition: 'opacity 0.2s',
-          }}>
-            Dekho <i className="fas fa-arrow-right text-xs" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── FestivalHub — the listing page ───────────────────────────
-interface Props {
-  onNavigate: (slug: string) => void;
-}
-
-export default function FestivalHub({ onNavigate }: Props) {
-  return (
-    <div style={{ fontFamily: "'Nunito',sans-serif" }}>
+    <div className="max-w-6xl mx-auto pb-16">
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 12,
-            background: 'linear-gradient(135deg, #8d5524, #b87333)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <i className="fas fa-star text-white text-sm" />
+      <div className="mb-10 text-center max-w-2xl mx-auto">
+        <FadeIn delay={0.1}>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#181818] border border-[#C9A96E]/30 mb-3">
+            <Calendar className="w-3.5 h-3.5 text-[#C9A96E]" />
+            <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#C9A96E]">
+              CULTURAL DISCOVERY & FESTIVALS
+            </span>
           </div>
-          <div>
-            <h2 style={{
-              fontFamily: "'Baloo 2',cursive",
-              fontSize: 22, fontWeight: 900,
-              color: 'var(--fg)', lineHeight: 1,
-            }}>
-              Festival Special
-            </h2>
-            <p style={{ fontSize: 12, color: 'var(--fg-muted)', marginTop: 1 }}>
-              Tyohar pe khaas offers — heritage shops se
-            </p>
-          </div>
-        </div>
-      </div>
+        </FadeIn>
 
-      {/* Festival cards */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {FESTIVALS.map(festival => (
-          <FestivalCard
-            key={festival.id}
-            festival={festival}
-            onOpen={onNavigate}
-          />
-        ))}
-      </div>
-
-      {/* Footer note */}
-      <div style={{
-        marginTop: 24, padding: '14px 16px',
-        background: 'var(--bg-card)',
-        border: '1px solid var(--border)',
-        borderRadius: 16,
-        display: 'flex', alignItems: 'center', gap: 10,
-      }}>
-        <i className="fas fa-info-circle" style={{ color: '#8d5524' }} />
-        <p style={{ fontSize: 12, color: 'var(--fg-muted)', lineHeight: 1.5 }}>
-          Yeh offers limited time ke liye hain. Shop se contact karke confirm kar lo.
+        <h1 className="font-serif text-3xl sm:text-5xl font-bold text-[#F5F5F5] mb-3">
+          Traditional Bazaars & Festive Heritage
+        </h1>
+        <p className="text-xs sm:text-sm text-[#A1A1AA] leading-relaxed">
+          Explore iconic regional festivals, authentic preparations, and curated heritage workshops keeping Indian cultural heritage alive.
         </p>
+      </div>
+
+      {/* Grid of Festivals */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {FESTIVALS.map((fest, idx) => (
+          <FadeIn key={fest.id} delay={idx * 0.08}>
+            <div
+              onClick={() => handleSelect(fest.slug)}
+              className="group relative rounded-3xl bg-[#121212] hover:bg-[#161616] border border-white/[0.08] hover:border-[#C9A96E]/40 p-6 shadow-xl hover:shadow-2xl transition-all duration-300 cursor-pointer flex flex-col justify-between h-full hover:-translate-y-1.5"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-4xl filter drop-shadow-md">{fest.emoji}</span>
+                  <span className="px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#C9A96E]/15 text-[#C9A96E] border border-[#C9A96E]/30">
+                    {fest.date}
+                  </span>
+                </div>
+
+                <p className="text-[11px] font-mono text-[#71717A] uppercase tracking-wider mb-1 font-bold">
+                  {fest.nameHindi}
+                </p>
+                <h3 className="font-serif text-2xl font-bold text-[#F5F5F5] group-hover:text-[#C9A96E] transition-colors mb-2">
+                  {fest.name}
+                </h3>
+                <p className="text-xs text-[#A1A1AA] leading-relaxed line-clamp-3 mb-6">
+                  {fest.tagline || fest.description}
+                </p>
+              </div>
+
+              <div className="pt-4 border-t border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs text-[#71717A]">
+                  <Store className="w-3.5 h-3.5 text-[#C9A96E]" />
+                  <span>{fest.offers.length} Featured Stores</span>
+                </div>
+
+                <div className="inline-flex items-center gap-1 text-xs font-bold text-[#F5F5F5] group-hover:text-[#C9A96E] transition-colors">
+                  <span>Explore</span>
+                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </div>
+          </FadeIn>
+        ))}
       </div>
     </div>
   );
