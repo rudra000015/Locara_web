@@ -1,7 +1,12 @@
 'use client';
 
 import ExplorerApp from '@/components/explorer/ExplorerApp';
+import ShopShutter from '@/components/ui/ShopShutter';
 
 export default function Home() {
-  return <ExplorerApp routePage="home" />;
+  return (
+    <ShopShutter>
+      <ExplorerApp routePage="home" />
+    </ShopShutter>
+  );
 }

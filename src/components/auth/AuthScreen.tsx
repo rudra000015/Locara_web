@@ -1,546 +1,502 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { Compass, Store, Sparkles, ArrowRight, ShieldCheck, CheckCircle2, ChevronRight, LogIn } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  Compass,
+  Store,
+  ArrowRight,
+  ShieldCheck,
+  CheckCircle2,
+  Lock,
+  Mail,
+  User as UserIcon,
+  Phone,
+  Sparkles,
+  Tag,
+  Building2,
+} from 'lucide-react';
 import { useStore } from '@/store/useStore';
-import { useT } from '@/i18n/useT';
-import PremiumButton from '@/components/ui/PremiumButton';
-
-declare global {
-  interface Window {
-    google?: any;
-  }
-}
 
 interface AuthScreenProps {
-  onLoginSuccess: (role: 'explorer' | 'owner') => void;
+  onLoginSuccess?: (role: 'explorer' | 'owner') => void;
   initialRole?: 'explorer' | 'owner';
-  initialMode?: 'login' | 'signup';
-}
-
-interface AuthApiResponse {
-  user?: {
-    id?: string;
-    name: string;
-    email?: string;
-    role: 'explorer' | 'owner';
-    img?: string;
-  };
-  token?: string;
-  error?: string;
 }
 
 function fallbackAvatar(seed: string) {
   return `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(seed)}`;
 }
 
-const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-const GOOGLE_GSI_SCRIPT = 'https://accounts.google.com/gsi/client';
-
 export default function AuthScreen({
   onLoginSuccess,
   initialRole = 'explorer',
-  initialMode = 'login',
 }: AuthScreenProps) {
-  const [selectedRole, setSelectedRole] = useState<'explorer' | 'owner' | null>(null);
-  const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [googleReady, setGoogleReady] = useState(false);
-  const [googleFallbackUrl, setGoogleFallbackUrl] = useState('');
-  const { setUser, showToast } = useStore();
-  const t = useT();
+  const router = useRouter();
+  const { setUser, setMode, showToast } = useStore();
 
-  const persistSession = useCallback(
-    (payload: NonNullable<AuthApiResponse['user']>, token: string) => {
-      const nextUser = {
-        id: payload.id,
-        name: payload.name,
-        email: payload.email,
-        img: payload.img || fallbackAvatar(payload.email || payload.name),
-        role: payload.role,
-      };
+  const [tab, setTab] = useState<'signin' | 'register'>('signin');
+  const [selectedRole, setSelectedRole] = useState<'explorer' | 'owner'>(initialRole);
 
-      localStorage.setItem('auth_token', token);
-      localStorage.setItem('user_data', JSON.stringify(nextUser));
-      setUser(nextUser, payload.role);
-      onLoginSuccess(payload.role);
-    },
-    [onLoginSuccess, setUser]
-  );
-
-  const loadGoogleScript = useCallback(async () => {
-    if (typeof window === 'undefined') return;
-    if (window.google?.accounts?.id) {
-      setGoogleReady(true);
-      return;
-    }
-
-    await new Promise<void>((resolve, reject) => {
-      const existing = document.querySelector('script[data-google-gsi="1"]') as HTMLScriptElement | null;
-      if (existing) {
-        if (window.google?.accounts?.id) {
-          resolve();
-          return;
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const urlRole = new URLSearchParams(window.location.search).get('role');
+        if (urlRole === 'owner' || urlRole === 'explorer') {
+          setSelectedRole(urlRole);
         }
-        existing.addEventListener('load', () => resolve(), { once: true });
-        existing.addEventListener('error', () => reject(new Error('Unable to load Google script')), {
-          once: true,
-        });
-        return;
       }
-
-      const script = document.createElement('script');
-      script.src = GOOGLE_GSI_SCRIPT;
-      script.async = true;
-      script.defer = true;
-      script.dataset.googleGsi = '1';
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Unable to load Google script'));
-      document.head.appendChild(script);
-    });
-
-    if (window.google?.accounts?.id) {
-      setGoogleReady(true);
-    }
+    } catch {}
   }, []);
 
-  const signInWithGoogleCredential = useCallback(
-    async (credential: string) => {
-      const activeRole = selectedRole || 'explorer';
-      const res = await fetch('/api/auth/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential, role: activeRole }),
-      });
-      const data = (await res.json()) as AuthApiResponse;
-      if (!res.ok || !data.user || !data.token) {
-        throw new Error(data.error || 'Google sign-in failed');
-      }
-      persistSession(data.user, data.token);
-      showToast('Signed in successfully with Google');
-    },
-    [persistSession, selectedRole, showToast]
-  );
+  // Form fields
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [storeName, setStoreName] = useState('');
+  const [storeCategory, setStoreCategory] = useState('Heritage Textiles');
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  useEffect(() => {
-    let cancelled = false;
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage('');
 
-    const restoreSession = async () => {
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        if (!cancelled) setLoading(false);
-        return;
-      }
+    if (!email || !email.includes('@')) {
+      setErrorMessage('Please enter a valid email address');
+      return;
+    }
+
+    if (password.length < 4) {
+      setErrorMessage('Password must be at least 4 characters long');
+      return;
+    }
+
+    if (tab === 'register' && !name) {
+      setErrorMessage('Please enter your full name');
+      return;
+    }
+
+    if (tab === 'register' && selectedRole === 'owner' && !storeName) {
+      setErrorMessage('Please enter your boutique or studio name');
+      return;
+    }
+
+    setIsLoading(true);
+
+    setTimeout(() => {
+      setIsLoading(false);
+      const userName = name || (email.split('@')[0]);
+      const mockUser = {
+        id: `usr_${Date.now()}`,
+        name: userName,
+        email,
+        phone: phone || '+91 98450 12345',
+        role: selectedRole,
+        img: fallbackAvatar(userName),
+        storeName: selectedRole === 'owner' ? (storeName || 'My Boutique') : undefined,
+      };
 
       try {
-        const res = await fetch('/api/auth/me', {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: 'no-store',
-        });
-        const data = (await res.json()) as AuthApiResponse;
+        localStorage.setItem('auth_token', `demo_token_${Date.now()}`);
+        localStorage.setItem('user_data', JSON.stringify(mockUser));
+        sessionStorage.setItem('locara_shutter_opened', 'true');
+      } catch {}
 
-        if (!res.ok || !data.user) {
-          throw new Error(data.error || 'Session expired');
-        }
+      setUser(mockUser, selectedRole);
+      setMode(selectedRole);
+      showToast(
+        tab === 'signin'
+          ? `Welcome back, ${userName}!`
+          : `Account registered successfully as ${selectedRole === 'owner' ? 'Store Owner' : 'Explorer'}!`
+      );
 
-        persistSession(data.user, token);
-      } catch {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user_data');
-      } finally {
-        if (!cancelled) setLoading(false);
+      if (onLoginSuccess) {
+        onLoginSuccess(selectedRole);
+      } else {
+        router.push(selectedRole === 'owner' ? '/owner' : '/');
       }
-    };
-
-    void restoreSession();
-    return () => {
-      cancelled = true;
-    };
-  }, [persistSession]);
-
-  useEffect(() => {
-    if (!GOOGLE_CLIENT_ID) return;
-    void loadGoogleScript().catch(() => {
-      setGoogleReady(false);
-    });
-  }, [loadGoogleScript]);
-
-  const handleLogin = async () => {
-    if (!email || !password) {
-      setError('Please enter your email and password.');
-      return;
-    }
-
-    const activeRole = selectedRole || 'explorer';
-    setError('');
-    setLoading(true);
-    showToast('Signing in to Locara...');
-
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, role: activeRole }),
-      });
-      const data = (await res.json()) as AuthApiResponse;
-
-      if (!res.ok || !data.user || !data.token) {
-        throw new Error(data.error || 'Unable to sign in');
-      }
-
-      persistSession(data.user, data.token);
-      showToast('Welcome back to Locara');
-    } catch (e: any) {
-      setError(e?.message || 'Login failed');
-      setLoading(false);
-    }
+    }, 600);
   };
 
-  const handleSignup = async () => {
-    if (!name.trim() || !email || !password) {
-      setError('Name, email and password are required.');
-      return;
-    }
-
-    const activeRole = selectedRole || 'explorer';
-    setError('');
-    setLoading(true);
-    showToast('Creating your account...');
-
-    try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          email,
-          password,
-          role: activeRole,
-          img: fallbackAvatar(email),
-        }),
-      });
-
-      const data = (await res.json()) as AuthApiResponse;
-      if (!res.ok || !data.user || !data.token) {
-        throw new Error(data.error || 'Unable to create account');
-      }
-
-      persistSession(data.user, data.token);
-      showToast('Account created successfully');
-    } catch (e: any) {
-      setError(e?.message || 'Signup failed');
-      setLoading(false);
-    }
-  };
-
-  const handleGoogle = async () => {
-    if (!GOOGLE_CLIENT_ID) {
-      setError('Google sign-in is not configured. Add NEXT_PUBLIC_GOOGLE_CLIENT_ID in .env.local');
-      return;
-    }
-
-    setError('');
-    setLoading(true);
-    showToast('Connecting to Google...');
-
-    try {
-      await loadGoogleScript();
-
-      if (!window.google?.accounts?.id) {
-        throw new Error('Google SDK unavailable');
-      }
-
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: async (response: { credential?: string }) => {
-          try {
-            if (!response?.credential) {
-              throw new Error('No Google credential received');
-            }
-            await signInWithGoogleCredential(response.credential);
-          } catch (e: any) {
-            setError(e?.message || 'Google sign-in failed');
-            setLoading(false);
+  const handleQuickDemo = (role: 'explorer' | 'owner') => {
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsLoading(false);
+      const demoUser = role === 'owner'
+        ? {
+            id: 'usr_owner_maya',
+            name: 'Maya Rao',
+            email: 'maya@mayastudio.in',
+            phone: '+91 98860 44321',
+            role: 'owner' as const,
+            img: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=300&auto=format&fit=crop',
+            storeName: 'Maya Studio Indiranagar',
           }
-        },
-      });
+        : {
+            id: 'usr_explorer_rohan',
+            name: 'Rohan Mehta',
+            email: 'rohan.mehta@gmail.com',
+            phone: '+91 98450 99881',
+            role: 'explorer' as const,
+            img: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=300&auto=format&fit=crop',
+          };
 
-      const fallback = window.setTimeout(() => {
-        setLoading(false);
-      }, 8000);
+      try {
+        localStorage.setItem('auth_token', `demo_token_${Date.now()}`);
+        localStorage.setItem('user_data', JSON.stringify(demoUser));
+        sessionStorage.setItem('locara_shutter_opened', 'true');
+      } catch {}
 
-      window.google.accounts.id.prompt((notification: any) => {
-        if (notification?.isNotDisplayed?.() || notification?.isSkippedMoment?.()) {
-          clearTimeout(fallback);
-          setLoading(false);
-          setError('Google popup was blocked. Please allow popups.');
-        }
-      });
-    } catch (e: any) {
-      setError(e?.message || 'Google sign-in failed');
-      setLoading(false);
-    }
+      setUser(demoUser, role);
+      setMode(role);
+      showToast(`Signed in as ${demoUser.name} (${role === 'owner' ? 'Store Owner' : 'Explorer'})`);
+
+      if (onLoginSuccess) {
+        onLoginSuccess(role);
+      } else {
+        router.push(role === 'owner' ? '/owner' : '/');
+      }
+    }, 400);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-[#0E0B08]">
-        <div className="w-full max-w-md rounded-3xl bg-[#17120E] border border-[#F6EAD7]/10 p-8 shadow-2xl text-center">
-          <div className="w-12 h-12 rounded-2xl bg-[#211A14] border border-[#C8893F]/30 flex items-center justify-center mx-auto mb-4">
-            <div className="w-5 h-5 border-2 border-[#C8893F] border-t-transparent rounded-full animate-spin" />
+  return (
+    <div className="min-h-screen bg-[#faf9f4] text-[#1b1c19] flex flex-col justify-between selection:bg-[#f0e9ba]">
+      {/* Top Header */}
+      <header className="px-6 py-5 sm:px-12 flex items-center justify-between border-b border-[#cbc6b8]/40 bg-[#faf9f4]/80 backdrop-blur-md sticky top-0 z-40">
+        <div
+          onClick={() => router.push('/')}
+          className="flex items-center gap-3 cursor-pointer group"
+        >
+          <div className="w-9 h-9 rounded-full bg-[#54512d] flex items-center justify-center text-[#ffffff] shadow-sm group-hover:bg-[#3f3d22] transition-colors">
+            <Store className="w-4 h-4" />
           </div>
-          <h2 className="font-serif font-bold text-xl text-[#F6EAD7]">LOCARA</h2>
-          <p className="text-xs text-[#9E8B75] mt-1 font-mono tracking-wider uppercase">
-            Restoring session...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Step 1: Immersive Role Selection ──────────────────────────────
-  if (!selectedRole) {
-    return (
-      <div className="min-h-screen flex flex-col justify-between p-4 sm:p-8 bg-[#0E0B08] text-[#F6EAD7]">
-        {/* Top Branding */}
-        <div className="max-w-4xl mx-auto w-full pt-8 text-center">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#17120E] border border-[#C8893F]/30 mb-4">
-            <Sparkles className="w-3.5 h-3.5 text-[#C8893F]" />
-            <span className="text-[10px] font-mono font-bold tracking-[0.25em] uppercase text-[#E0AF62]">
-              LOCARA • HYPERLOCAL COMMERCE
+          <div>
+            <span className="font-serif text-xl font-bold tracking-tight text-[#1b1c19]">
+              LOCARA
+            </span>
+            <span className="block text-[10px] font-mono tracking-widest text-[#6d6943] uppercase">
+              Editorial Local Discovery
             </span>
           </div>
-
-          <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-[#F6EAD7] leading-tight">
-            Discover Local. Reserve Smart. <br />
-            <span className="italic text-[#E0AF62] font-normal">Shop Better.</span>
-          </h1>
-          <p className="text-sm sm:text-base text-[#9E8B75] mt-3 max-w-xl mx-auto">
-            Explore your city&apos;s physical local markets and iconic shops before walking into them.
-          </p>
         </div>
 
-        {/* The Two Large Immersive Role Cards */}
-        <div className="max-w-4xl mx-auto w-full my-12 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* CARD 1: EXPLORE LOCAL */}
-          <div
-            onClick={() => {
-              setSelectedRole('explorer');
-              setError('');
-            }}
-            className="group relative overflow-hidden rounded-3xl bg-gradient-to-b from-[#1B140F] to-[#140F0B] border border-[#F6EAD7]/10 hover:border-[#C8893F]/50 p-8 flex flex-col justify-between transition-all duration-300 hover:shadow-glow cursor-pointer"
-          >
-            <div className="absolute top-0 right-0 w-36 h-36 bg-[#C8893F]/10 rounded-full blur-3xl group-hover:bg-[#C8893F]/20 transition-all pointer-events-none" />
-
-            <div>
-              <div className="w-14 h-14 rounded-2xl bg-[#261D16] border border-[#C8893F]/30 flex items-center justify-center text-[#E0AF62] mb-6 group-hover:scale-110 transition-transform shadow-glow-sm">
-                <Compass className="w-7 h-7 text-[#C8893F]" />
-              </div>
-
-              <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#C8893F]">
-                FOR SHOPPERS & EXPLORERS
-              </span>
-              <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#F6EAD7] mt-1 mb-3">
-                Explore Local
-              </h2>
-              <p className="text-xs sm:text-sm text-[#9E8B75] leading-relaxed">
-                Discover shops, products, collections and offers near you. Reserve with a 10% advance and pick up in store.
-              </p>
-            </div>
-
-            <div className="mt-8 pt-6 border-t border-[#F6EAD7]/10 flex items-center justify-between">
-              <span className="font-bold text-xs text-[#E0AF62] group-hover:translate-x-1 transition-transform flex items-center gap-1.5">
-                Explore Locara <ArrowRight className="w-4 h-4" />
-              </span>
-              <span className="text-[10px] font-mono text-[#6E5D4B]">CONSUMER APP</span>
-            </div>
-          </div>
-
-          {/* CARD 2: GROW YOUR SHOP */}
-          <div
-            onClick={() => {
-              setSelectedRole('owner');
-              setError('');
-            }}
-            className="group relative overflow-hidden rounded-3xl bg-gradient-to-b from-[#1B140F] to-[#140F0B] border border-[#F6EAD7]/10 hover:border-[#1E5544]/60 p-8 flex flex-col justify-between transition-all duration-300 hover:shadow-glow-emerald cursor-pointer"
-          >
-            <div className="absolute top-0 right-0 w-36 h-36 bg-[#1E5544]/15 rounded-full blur-3xl group-hover:bg-[#1E5544]/30 transition-all pointer-events-none" />
-
-            <div>
-              <div className="w-14 h-14 rounded-2xl bg-[#172620] border border-[#1E5544]/40 flex items-center justify-center text-[#2D7D64] mb-6 group-hover:scale-110 transition-transform shadow-glow-emerald">
-                <Store className="w-7 h-7 text-[#2D7D64]" />
-              </div>
-
-              <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#2D7D64]">
-                FOR LOCAL SHOP OWNERS
-              </span>
-              <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#F6EAD7] mt-1 mb-3">
-                Grow Your Shop
-              </h2>
-              <p className="text-xs sm:text-sm text-[#9E8B75] leading-relaxed">
-                Create your premium digital storefront, manage reservations, verify pickups, and drive verified local footfall.
-              </p>
-            </div>
-
-            <div className="mt-8 pt-6 border-t border-[#F6EAD7]/10 flex items-center justify-between">
-              <span className="font-bold text-xs text-[#2D7D64] group-hover:translate-x-1 transition-transform flex items-center gap-1.5">
-                Become a Seller <ArrowRight className="w-4 h-4" />
-              </span>
-              <span className="text-[10px] font-mono text-[#6E5D4B]">MERCHANT WORKSPACE</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="text-center text-[11px] text-[#6E5D4B] font-mono pb-4">
-          LOCARA PLATFORM • SECURE HYPERLOCAL COMMERCE & DISCOVERY
-        </div>
-      </div>
-    );
-  }
-
-  // ── Step 2: Authentication Modal / View ────────────────────────────
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-[#0E0B08]">
-      <div className="w-full max-w-md rounded-3xl bg-[#17120E] border border-[#F6EAD7]/10 p-6 sm:p-8 shadow-2xl relative overflow-hidden animate-scale-in">
-        <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#C8893F]/10 rounded-full blur-3xl pointer-events-none" />
-
-        {/* Back to Role Selection */}
         <button
-          onClick={() => {
-            setSelectedRole(null);
-            setError('');
-          }}
-          className="text-xs text-[#9E8B75] hover:text-[#F6EAD7] flex items-center gap-1 mb-4 cursor-pointer font-semibold"
+          onClick={() => router.push('/')}
+          className="text-xs font-semibold text-[#54512d] hover:text-[#1b1c19] underline underline-offset-4 decoration-[#c8a1b1] transition-colors"
         >
-          ← Change Role
+          Explore Bangalore Bazaar →
         </button>
+      </header>
 
-        {/* Brand Header */}
-        <div className="text-center mb-6 relative z-10">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#261D16] to-[#1B140F] border border-[#C8893F]/30 flex items-center justify-center mx-auto mb-3 shadow-glow-sm">
-            {selectedRole === 'explorer' ? (
-              <Compass className="w-6 h-6 text-[#C8893F]" />
-            ) : (
-              <Store className="w-6 h-6 text-[#2D7D64]" />
-            )}
+      {/* Main Authentication Grid */}
+      <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-8 py-8 sm:py-12 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+        {/* Left Form Card */}
+        <div className="lg:col-span-7 bg-[#ffffff] border border-[rgba(72,55,47,0.12)] rounded-2xl p-6 sm:p-10 shadow-[0_12px_32px_-4px_rgba(72,55,47,0.06)]">
+          {/* Header & Mode Toggles */}
+          <div className="mb-6">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#efeee9] text-[#54512d] text-[11px] font-bold tracking-wider uppercase mb-2">
+              <Sparkles className="w-3 h-3 text-[#6d6943]" />
+              AUTHENTIC LOCAL COMMERCE
+            </span>
+            <h1 className="font-serif text-3xl sm:text-4xl font-bold text-[#1b1c19] tracking-tight">
+              {tab === 'signin' ? 'Welcome back to the Bazaar.' : 'Join the Locara Collective.'}
+            </h1>
+            <p className="text-xs sm:text-sm text-[#49473c] mt-1.5">
+              {tab === 'signin'
+                ? 'Sign in to access your offline reservation passes, saved gems, and secret city addresses.'
+                : 'Create your account to unlock offline drops, counter pickup OTPs, or register your boutique.'}
+            </p>
           </div>
-          <h1 className="font-serif text-2xl font-bold text-[#F6EAD7]">
-            {selectedRole === 'explorer' ? 'Explore Local Markets' : 'Seller Workspace Access'}
-          </h1>
-          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#E0AF62] mt-1">
-            {selectedRole === 'explorer' ? 'LOCARA • EXPLORER' : 'LOCARA • MERCHANT CONSOLE'}
-          </p>
-        </div>
 
-        {/* Mode Toggle (Sign In / Sign Up) */}
-        <div className="flex p-1 rounded-xl bg-[#211A14] border border-[#F6EAD7]/5 mb-5 relative z-10">
-          {(['login', 'signup'] as const).map((m) => (
+          {/* Tab Switcher */}
+          <div className="flex bg-[#f5f4ef] p-1 rounded-xl border border-[#cbc6b8]/50 mb-6">
             <button
-              key={m}
               type="button"
               onClick={() => {
-                setMode(m);
-                setError('');
+                setTab('signin');
+                setErrorMessage('');
               }}
-              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                mode === m ? 'bg-[#C8893F] text-[#0E0B08] shadow-glow-sm' : 'text-[#9E8B75] hover:text-[#F6EAD7]'
+              className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                tab === 'signin'
+                  ? 'bg-[#ffffff] text-[#1b1c19] shadow-sm'
+                  : 'text-[#6e5a51] hover:text-[#1b1c19]'
               }`}
             >
-              {m === 'login' ? 'Sign In' : 'Create Account'}
+              Sign In
             </button>
-          ))}
-        </div>
-
-        {/* Google Authentication */}
-        <div className="space-y-3 relative z-10">
-          <button
-            type="button"
-            onClick={handleGoogle}
-            disabled={!GOOGLE_CLIENT_ID}
-            className="w-full py-3 rounded-xl font-bold text-xs bg-[#211A14] hover:bg-[#2A2119] border border-[#F6EAD7]/10 hover:border-[#F6EAD7]/20 text-[#F6EAD7] flex items-center justify-center gap-2.5 transition-all cursor-pointer shadow-sm"
-          >
-            <LogIn className="w-4 h-4 text-[#C8893F]" />
-            <span>{GOOGLE_CLIENT_ID ? 'Continue with Google' : 'Google Sign-In'}</span>
-          </button>
-
-          <div className="flex items-center gap-3 py-1">
-            <div className="flex-1 h-px bg-[#F6EAD7]/10" />
-            <span className="text-[10px] font-mono uppercase text-[#9E8B75] tracking-wider">
-              OR EMAIL
-            </span>
-            <div className="flex-1 h-px bg-[#F6EAD7]/10" />
+            <button
+              type="button"
+              onClick={() => {
+                setTab('register');
+                setErrorMessage('');
+              }}
+              className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                tab === 'register'
+                  ? 'bg-[#ffffff] text-[#1b1c19] shadow-sm'
+                  : 'text-[#6e5a51] hover:text-[#1b1c19]'
+              }`}
+            >
+              Create Account
+            </button>
           </div>
 
-          {/* Form Inputs */}
-          {mode === 'signup' && (
-            <div>
-              <label className="block text-[10px] font-mono uppercase text-[#9E8B75] mb-1 font-bold">
-                Full Name
-              </label>
-              <input
-                type="text"
-                placeholder="Rudra Sharma"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl text-xs bg-[#211A14] border border-[#F6EAD7]/10 text-[#F6EAD7] placeholder-[#6E5D4B] outline-none focus:border-[#C8893F] transition-colors"
-              />
+          {/* Role Selection */}
+          <div className="mb-6">
+            <label className="block text-[11px] font-bold text-[#49473c] uppercase tracking-wider mb-2">
+              Select Your Profile Role
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <div
+                onClick={() => setSelectedRole('explorer')}
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${
+                  selectedRole === 'explorer'
+                    ? 'bg-[#f0e9ba]/30 border-[#54512d] ring-1 ring-[#54512d]'
+                    : 'bg-[#f5f4ef] border-[#cbc6b8]/40 hover:border-[#54512d]/40'
+                }`}
+              >
+                <div
+                  className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                    selectedRole === 'explorer'
+                      ? 'bg-[#54512d] text-[#ffffff]'
+                      : 'bg-[#e3e3de] text-[#6e5a51]'
+                  }`}
+                >
+                  <Compass className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-[#1b1c19]">Explorer</h4>
+                  <p className="text-[11px] text-[#49473c] line-clamp-1">Shopper & Collector</p>
+                </div>
+              </div>
+
+              <div
+                onClick={() => setSelectedRole('owner')}
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${
+                  selectedRole === 'owner'
+                    ? 'bg-[#f0e9ba]/30 border-[#54512d] ring-1 ring-[#54512d]'
+                    : 'bg-[#f5f4ef] border-[#cbc6b8]/40 hover:border-[#54512d]/40'
+                }`}
+              >
+                <div
+                  className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                    selectedRole === 'owner'
+                      ? 'bg-[#54512d] text-[#ffffff]'
+                      : 'bg-[#e3e3de] text-[#6e5a51]'
+                  }`}
+                >
+                  <Store className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-[#1b1c19]">Store Owner</h4>
+                  <p className="text-[11px] text-[#49473c] line-clamp-1">Boutique & Artisan</p>
+                </div>
+              </div>
             </div>
-          )}
-
-          <div>
-            <label className="block text-[10px] font-mono uppercase text-[#9E8B75] mb-1 font-bold">
-              Email Address
-            </label>
-            <input
-              type="email"
-              placeholder="explorer@locara.app"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl text-xs bg-[#211A14] border border-[#F6EAD7]/10 text-[#F6EAD7] placeholder-[#6E5D4B] outline-none focus:border-[#C8893F] transition-colors"
-            />
           </div>
 
-          <div>
-            <label className="block text-[10px] font-mono uppercase text-[#9E8B75] mb-1 font-bold">
-              Password
-            </label>
-            <input
-              type="password"
-              placeholder="••••••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl text-xs bg-[#211A14] border border-[#F6EAD7]/10 text-[#F6EAD7] placeholder-[#6E5D4B] outline-none focus:border-[#C8893F] transition-colors"
-            />
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {errorMessage && (
+              <div className="p-3 rounded-lg bg-[#ffdad6] border border-[#ba1a1a]/30 text-[#93000a] text-xs font-medium flex items-center gap-2">
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            {tab === 'register' && (
+              <div>
+                <label className="block text-[11px] font-bold text-[#49473c] uppercase tracking-wider mb-1.5">
+                  Full Name
+                </label>
+                <div className="relative">
+                  <UserIcon className="w-4 h-4 text-[#7a776b] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Rohan Mehta"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#f5f4ef] border border-[#cbc6b8] text-xs text-[#1b1c19] placeholder-[#7a776b] focus:bg-[#ffffff] focus:border-[#54512d] focus:outline-none transition-all"
+                  />
+                </div>
+              </div>
+            )}
+
+            {tab === 'register' && selectedRole === 'owner' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#49473c] uppercase tracking-wider mb-1.5">
+                    Boutique / Brand Name
+                  </label>
+                  <div className="relative">
+                    <Building2 className="w-4 h-4 text-[#7a776b] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={storeName}
+                      onChange={(e) => setStoreName(e.target.value)}
+                      placeholder="e.g. Maya Studio Indiranagar"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#f5f4ef] border border-[#cbc6b8] text-xs text-[#1b1c19] placeholder-[#7a776b] focus:bg-[#ffffff] focus:border-[#54512d] focus:outline-none transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[#49473c] uppercase tracking-wider mb-1.5">
+                    Primary Craft Category
+                  </label>
+                  <select
+                    value={storeCategory}
+                    onChange={(e) => setStoreCategory(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-[#f5f4ef] border border-[#cbc6b8] text-xs text-[#1b1c19] focus:bg-[#ffffff] focus:border-[#54512d] focus:outline-none transition-all"
+                  >
+                    <option value="Heritage Textiles">Heritage Textiles & Silks</option>
+                    <option value="Ceramics & Decor">Studio Pottery & Ceramics</option>
+                    <option value="Fine Jewellery">Artisanal Jewellery</option>
+                    <option value="Specialty Coffee">Artisanal Coffee & Roasters</option>
+                    <option value="Antiques & Vintage">Antiques & Curiosities</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-[11px] font-bold text-[#49473c] uppercase tracking-wider mb-1.5">
+                Email Address
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-[#7a776b] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#f5f4ef] border border-[#cbc6b8] text-xs text-[#1b1c19] placeholder-[#7a776b] focus:bg-[#ffffff] focus:border-[#54512d] focus:outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            {tab === 'register' && (
+              <div>
+                <label className="block text-[11px] font-bold text-[#49473c] uppercase tracking-wider mb-1.5">
+                  Phone Number <span className="text-[10px] text-[#7a776b] font-normal">(For in-store pickup SMS)</span>
+                </label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-[#7a776b] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+91 98450 12345"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#f5f4ef] border border-[#cbc6b8] text-xs text-[#1b1c19] placeholder-[#7a776b] focus:bg-[#ffffff] focus:border-[#54512d] focus:outline-none transition-all"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-[11px] font-bold text-[#49473c] uppercase tracking-wider mb-1.5">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-[#7a776b] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#f5f4ef] border border-[#cbc6b8] text-xs text-[#1b1c19] placeholder-[#7a776b] focus:bg-[#ffffff] focus:border-[#54512d] focus:outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-3 px-6 rounded-full bg-[#48372f] hover:bg-[#3d2d26] text-[#faf9f4] font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer mt-2"
+            >
+              {isLoading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <span>
+                    {tab === 'signin'
+                      ? `Sign In as ${selectedRole === 'owner' ? 'Store Owner' : 'Explorer'}`
+                      : `Complete Registration`}
+                  </span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Quick Demo Access Bar */}
+          <div className="mt-6 pt-6 border-t border-[#cbc6b8]/40">
+            <span className="block text-[11px] font-mono text-[#7a776b] uppercase text-center mb-3">
+              — Instant Demo Credentials —
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => handleQuickDemo('explorer')}
+                className="py-2.5 px-3 rounded-xl bg-[#f5f4ef] hover:bg-[#efeee9] border border-[#cbc6b8] text-left flex items-center justify-between text-xs font-semibold text-[#1b1c19] transition-all cursor-pointer"
+              >
+                <div>
+                  <span className="block text-[11px] font-bold text-[#54512d]">Demo Explorer</span>
+                  <span className="text-[10px] text-[#7a776b]">Rohan Mehta (Level 3)</span>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-[#54512d]" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickDemo('owner')}
+                className="py-2.5 px-3 rounded-xl bg-[#f5f4ef] hover:bg-[#efeee9] border border-[#cbc6b8] text-left flex items-center justify-between text-xs font-semibold text-[#1b1c19] transition-all cursor-pointer"
+              >
+                <div>
+                  <span className="block text-[11px] font-bold text-[#6e5a51]">Demo Store Owner</span>
+                  <span className="text-[10px] text-[#7a776b]">Maya Rao (Maya Studio)</span>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-[#6e5a51]" />
+              </button>
+            </div>
           </div>
-
-          <PremiumButton
-            variant="gold"
-            size="md"
-            onClick={mode === 'login' ? handleLogin : handleSignup}
-            className="w-full mt-2"
-            magnetic
-          >
-            {mode === 'login'
-              ? selectedRole === 'explorer'
-                ? 'Start Exploring'
-                : 'Access Seller Console'
-              : selectedRole === 'explorer'
-              ? 'Create Explorer Account'
-              : 'Create Seller Account'}
-          </PremiumButton>
-
-          {error && (
-            <p className="text-center text-xs text-[#C24136] bg-[#C24136]/10 p-3 rounded-xl border border-[#C24136]/20 mt-2">
-              {error}
-            </p>
-          )}
         </div>
-      </div>
+
+        {/* Right Editorial Vignette Card */}
+        <div className="lg:col-span-5 h-[500px] lg:h-[620px] rounded-2xl overflow-hidden border border-[rgba(72,55,47,0.15)] shadow-xl relative flex flex-col justify-end p-8 sm:p-10">
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{
+              backgroundImage: `url('https://images.unsplash.com/photo-1596178065887-1198b6148b2b?q=80&w=1200&auto=format&fit=crop')`,
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#1b1c19] via-[#1b1c19]/60 to-transparent" />
+
+          <div className="relative z-10 text-[#faf9f4] space-y-3">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#faf9f4]/20 backdrop-blur-md text-[#f0e9ba] text-[10px] font-mono font-bold tracking-widest uppercase">
+              BANGALORE ATELIER INDEX
+            </span>
+            <h2 className="font-serif text-3xl sm:text-4xl font-bold leading-tight">
+              &ldquo;Physical presence is the ultimate luxury.&rdquo;
+            </h2>
+            <p className="text-xs text-[#cec89b] font-serif italic">
+              Locara connects discerning urbanites with verified offline ateliers, living bazaars, and generational masters.
+            </p>
+
+            <div className="pt-4 border-t border-[#cbc6b8]/30 flex items-center justify-between text-[11px] font-mono text-[#cec89b]">
+              <span>VERIFIED IRL DROPS</span>
+              <span>•</span>
+              <span>COUNTER PICKUPS</span>
+              <span>•</span>
+              <span>COMMUNITY RADAR</span>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="px-6 py-4 border-t border-[#cbc6b8]/40 bg-[#faf9f4] text-center text-[11px] font-mono text-[#7a776b]">
+        LOCARA INDEPENDENT EDITORIAL COMMERCE • BANGALORE • DELHI • MUMBAI
+      </footer>
     </div>
   );
 }

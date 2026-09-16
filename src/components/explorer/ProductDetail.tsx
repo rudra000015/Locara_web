@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useShopDetail } from '@/hooks/useShops';
 import { useStore } from '@/store/useStore';
 import { prodImg } from '@/utils/prodImg';
+import ReservationDepositModal from './ReservationDepositModal';
 import {
   ChevronLeft,
   Heart,
@@ -18,49 +19,66 @@ import {
   ShoppingBag,
   ShieldCheck,
   Tag,
-  Camera,
+  QrCode,
+  Check,
+  X,
+  MapPin,
+  ArrowRight,
 } from 'lucide-react';
-import PremiumButton from '@/components/ui/PremiumButton';
-import ReservationModal from './ReservationModal';
-import ReservationConfirmationModal from './ReservationConfirmationModal';
-import VisualSearchModal from './VisualSearchModal';
 
 export default function ProductDetail() {
   const router = useRouter();
-  const { currentShopId, currentProdId, openShop, viewProduct, toggleWish, isWished, addToCart, navTo, showToast } = useStore();
+  const {
+    currentShopId,
+    currentProdId,
+    openShop,
+    viewProduct,
+    toggleWish,
+    isWished,
+    addToCart,
+    createReservation,
+    navTo,
+    showToast,
+    user,
+  } = useStore();
   const { shop, loading, error } = useShopDetail(currentShopId);
 
   const [selectedSize, setSelectedSize] = useState('M');
-  const [selectedColor, setSelectedColor] = useState('Black');
+  const [selectedColor, setSelectedColor] = useState('Natural');
   const [quantity, setQuantity] = useState(1);
   const [isReserveModalOpen, setIsReserveModalOpen] = useState(false);
-  const [confirmedReservation, setConfirmedReservation] = useState<any | null>(null);
-  const [showSimilarModal, setShowSimilarModal] = useState(false);
+  const [confirmedPass, setConfirmedPass] = useState<any | null>(null);
+
+  // Form state
+  const [customerName, setCustomerName] = useState(user?.name || 'Rohan Mehta');
+  const [customerPhone, setCustomerPhone] = useState(user?.phone || '+91 98450 99881');
+  const [pickupWindow, setPickupWindow] = useState('Tomorrow (3 PM - 7 PM)');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto py-16 text-center">
-        <div className="w-10 h-10 mx-auto border-2 border-[#C8893F] border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs text-[#9E8B75] mt-4 font-mono tracking-wider uppercase">Loading product showcase...</p>
+      <div className="max-w-4xl mx-auto py-24 text-center">
+        <div className="w-10 h-10 mx-auto border-2 border-[#54512d] border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs text-[#7a776b] mt-4 font-mono tracking-wider uppercase">Loading atelier piece...</p>
       </div>
     );
   }
 
   const s = shop;
-  const p = s?.products.find((x) => x.id === currentProdId);
+  const p = s?.products.find((x) => x.id === currentProdId) || s?.products[0];
   const prodIndex = s?.products.findIndex((x) => x.id === currentProdId) ?? 0;
-  const others = s?.products.filter((x) => x.id !== currentProdId).slice(0, 4) ?? [];
+  const others = s?.products.filter((x) => x.id !== currentProdId).slice(0, 3) ?? [];
 
   if (error || !s || !p) {
     return (
       <div className="max-w-md mx-auto py-24 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-[#17120E] border border-[#F6EAD7]/10 flex items-center justify-center text-2xl mx-auto mb-3">
+        <div className="w-14 h-14 rounded-2xl bg-[#ffffff] border border-[#cbc6b8] flex items-center justify-center text-2xl mx-auto mb-3 shadow-sm">
           🔍
         </div>
-        <h3 className="font-serif text-lg font-bold text-[#F6EAD7] mb-1">Product Not Found</h3>
-        <p className="text-xs text-[#9E8B75] mb-6">This item could not be retrieved.</p>
-        <button onClick={() => navTo('home')} className="btn-gold text-xs">
-          Return to Explorer
+        <h3 className="font-serif text-lg font-bold text-[#1b1c19] mb-1">Item Not Found</h3>
+        <p className="text-xs text-[#7a776b] mb-6">This atelier piece could not be retrieved.</p>
+        <button onClick={() => router.push('/products')} className="btn-primary-irl text-xs">
+          Browse Verified Drops →
         </button>
       </div>
     );
@@ -68,15 +86,13 @@ export default function ProductDetail() {
 
   const wished = isWished(s.id, p.id);
   const imgSrc = p.image || prodImg(p.name, prodIndex);
-  const advanceAmount = Math.round(p.price * 0.1);
-  const balanceAmount = p.price - advanceAmount;
 
   const handleAddToCart = () => {
     addToCart({
       productId: p.id,
       name: p.name,
       price: p.price,
-      unit: p.unit || 'unit',
+      unit: p.unit || 'piece',
       size: selectedSize,
       color: selectedColor,
       quantity,
@@ -87,32 +103,57 @@ export default function ProductDetail() {
     });
   };
 
+  const handleConfirmReservation = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    setTimeout(() => {
+      setIsSubmitting(false);
+      const newPass = createReservation({
+        productId: p.id,
+        productName: p.name,
+        productImage: imgSrc,
+        price: p.price,
+        shopId: s.id,
+        shopName: s.name,
+        shopAddress: s.addr,
+        shopPhone: s.phone || '+91 80 4123 9988',
+        shopLocation: s.loc as [number, number],
+        customerName,
+        customerPhone,
+        pickupDate: pickupWindow,
+        timeSlot: '3:00 PM - 7:00 PM',
+      });
+      setConfirmedPass(newPass);
+    }, 400);
+  };
+
   return (
-    <div className="max-w-4xl mx-auto pb-16">
+    <div className="max-w-5xl mx-auto pb-32">
       {/* Back Button */}
       <button
         onClick={() => {
           openShop(s.id);
-          router.push(`/explorer/shop/${s.id}`);
+          router.push(`/shops/${s.id}`);
         }}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#17120E] border border-[#F6EAD7]/10 text-xs font-bold text-[#9E8B75] hover:text-[#F6EAD7] hover:bg-[#211A14] transition-all mb-6 cursor-pointer"
+        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#ffffff] border border-[rgba(72,55,47,0.12)] text-xs font-bold text-[#49473c] hover:text-[#1b1c19] hover:border-[#54512d] transition-all mb-6 cursor-pointer shadow-sm"
       >
         <ChevronLeft className="w-4 h-4" /> Back to {s.name}
       </button>
 
       {/* Main Showcase Card */}
-      <div className="bg-[#17120E] border border-[#F6EAD7]/10 rounded-3xl p-6 sm:p-10 shadow-2xl">
-        <div className="flex flex-col md:flex-row gap-8">
+      <div className="bg-[#ffffff] border border-[rgba(72,55,47,0.12)] rounded-2xl p-6 sm:p-10 shadow-[0_12px_32px_-4px_rgba(72,55,47,0.06)]">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
           {/* Media Image Gallery */}
-          <div className="w-full md:w-96 aspect-square bg-[#211A14] rounded-3xl overflow-hidden relative border border-[#F6EAD7]/10 shrink-0">
+          <div className="md:col-span-6 aspect-square bg-[#efeee9] rounded-2xl overflow-hidden relative border border-[#cbc6b8]/50 shrink-0">
             <img
               src={imgSrc}
               alt={p.name}
               className="w-full h-full object-cover"
             />
             {p.isNew && (
-              <span className="absolute top-4 left-4 px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-[#C8893F] text-[#0E0B08] flex items-center gap-1 shadow-glow-sm">
-                <Sparkles className="w-3 h-3" /> NEW ARRIVAL
+              <span className="absolute top-4 left-4 px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-[#54512d] text-[#ffffff] flex items-center gap-1 shadow-sm uppercase tracking-wider">
+                <Sparkles className="w-3 h-3 text-[#f0e9ba]" /> NEW OFFLINE DROP
               </span>
             )}
             <button
@@ -124,7 +165,7 @@ export default function ProductDetail() {
                     id: p.id,
                     name: p.name,
                     price: p.price,
-                    unit: p.unit || 'unit',
+                    unit: p.unit || 'piece',
                     inStock: true,
                     isNew: Boolean(p.isNew),
                     image: imgSrc,
@@ -134,105 +175,73 @@ export default function ProductDetail() {
                 )
               }
               title={wished ? 'Remove from Wishlist' : 'Save to Wishlist'}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/70 backdrop-blur-md border border-white/10 flex items-center justify-center hover:scale-110 transition-all text-white cursor-pointer"
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-[#ffffff]/90 backdrop-blur-md border border-[rgba(72,55,47,0.15)] flex items-center justify-center hover:scale-110 transition-all text-[#1b1c19] cursor-pointer shadow-sm"
             >
               <Heart
-                className={`w-5 h-5 ${wished ? 'text-[#C24136] fill-[#C24136]' : 'text-white'}`}
+                className={`w-5 h-5 ${wished ? 'text-[#ba1a1a] fill-[#ba1a1a]' : 'text-[#49473c]'}`}
               />
             </button>
           </div>
 
           {/* Details & Selectors */}
-          <div className="flex-1 flex flex-col justify-between">
+          <div className="md:col-span-6 flex flex-col justify-between space-y-6">
             <div>
               {/* Origin Shop Link */}
               <p
                 onClick={() => {
                   openShop(s.id);
-                  router.push(`/explorer/shop/${s.id}`);
+                  router.push(`/shops/${s.id}`);
                 }}
-                className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-[#E0AF62] uppercase tracking-wider mb-2 cursor-pointer hover:underline"
+                className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-[#54512d] uppercase tracking-wider mb-2 cursor-pointer hover:underline"
               >
-                <Store className="w-3.5 h-3.5 text-[#C8893F]" />
-                {s.name} • Est. {s.est}
+                <Store className="w-3.5 h-3.5 text-[#54512d]" />
+                {s.name} • {s.cat}
               </p>
 
-              <h1 className="font-serif text-2xl sm:text-4xl font-bold text-[#F6EAD7] mb-2">
+              <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#1b1c19] leading-tight mb-3">
                 {p.name}
               </h1>
 
-              {/* Pricing & 10% Advance Breakdown */}
+              {/* Pricing */}
               <div className="flex items-baseline gap-3 mb-4">
-                <span className="font-mono text-3xl font-bold text-[#E0AF62]">
+                <span className="font-serif text-3xl font-bold text-[#1b1c19]">
                   ₹{p.price.toLocaleString('en-IN')}
                 </span>
-                <span className="text-xs text-[#9E8B75]">per {p.unit || 'piece'}</span>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#1E5544]/25 text-[#2D7D64] border border-[#1E5544]/40">
-                  Reserve for ₹{advanceAmount} (10%)
+                <span className="text-xs text-[#7a776b]">per {p.unit || 'piece'}</span>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#efeee9] text-[#54512d] border border-[#cbc6b8]">
+                  48H Counter Hold Free
                 </span>
               </div>
 
               {/* Status Pills */}
               <div className="flex flex-wrap items-center gap-2 mb-5">
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#1E5544]/15 text-[#2D7D64] border border-[#1E5544]/30 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> In Stock at Shop
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#e8f5e9] text-[#2e7d32] border border-[#2e7d32]/30 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> In Physical Stock
                 </span>
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#211A14] text-[#F6EAD7] border border-[#F6EAD7]/10 flex items-center gap-1">
-                  <Star className="w-3.5 h-3.5 text-[#C8893F] fill-[#C8893F]" /> {s.rating} Rating
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#f5f4ef] text-[#1b1c19] border border-[#cbc6b8]/50 flex items-center gap-1">
+                  <Star className="w-3.5 h-3.5 text-[#54512d] fill-[#54512d]" /> {s.rating} Rating
                 </span>
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#C8893F]/10 text-[#E0AF62] border border-[#C8893F]/20 font-mono">
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#f5f4ef] text-[#54512d] border border-[#cbc6b8]/50 font-mono">
                   {s.age} Yrs Heritage
                 </span>
               </div>
 
-              {/* Variant Selectors */}
-              <div className="space-y-3 mb-6 p-4 rounded-2xl bg-[#211A14] border border-[#F6EAD7]/10">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-mono uppercase text-[#9E8B75] font-bold">Size / Format:</span>
-                  <div className="flex gap-1.5">
-                    {['S', 'M', 'L', 'XL'].map((sz) => (
-                      <button
-                        key={sz}
-                        type="button"
-                        onClick={() => setSelectedSize(sz)}
-                        className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${
-                          selectedSize === sz
-                            ? 'bg-[#C8893F] text-[#0E0B08]'
-                            : 'bg-[#17120E] text-[#D8C4A7] hover:bg-white/5'
-                        }`}
-                      >
-                        {sz}
-                      </button>
-                    ))}
-                  </div>
+              {/* Description & Authenticity */}
+              <div className="p-4 rounded-xl bg-[#f5f4ef] border border-[#cbc6b8]/50 space-y-2 mb-6">
+                <div className="flex items-center gap-2 text-[11px] font-bold text-[#54512d] uppercase tracking-wider">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Verified Authenticity</span>
                 </div>
-
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-mono uppercase text-[#9E8B75] font-bold">Color:</span>
-                  <div className="flex gap-1.5">
-                    {['Black', 'Cream', 'Emerald', 'Gold'].map((clr) => (
-                      <button
-                        key={clr}
-                        type="button"
-                        onClick={() => setSelectedColor(clr)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                          selectedColor === clr
-                            ? 'bg-[#E0AF62] text-[#0E0B08]'
-                            : 'bg-[#17120E] text-[#D8C4A7] hover:bg-white/5'
-                        }`}
-                      >
-                        {clr}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <p className="text-xs text-[#49473c] leading-relaxed">
+                  Crafted by master artisans. Available exclusively for offline inspection and in-person pickup.
+                </p>
               </div>
 
               {/* Physical Shop Information */}
-              <div className="p-3.5 rounded-2xl bg-[#1B140F] border border-[#F6EAD7]/10 mb-6 flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-bold text-[#F6EAD7]">{s.name}</p>
-                  <p className="text-[11px] text-[#9E8B75] truncate max-w-xs">{s.addr}</p>
+              <div className="p-4 rounded-xl bg-[#faf9f4] border border-[#cbc6b8]/60 flex items-center justify-between gap-3 mb-6">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-[#1b1c19]">{s.name}</p>
+                  <p className="text-[11px] text-[#7a776b] truncate">{s.addr}</p>
                 </div>
                 <button
                   type="button"
@@ -244,123 +253,54 @@ export default function ProductDetail() {
                       );
                     }
                   }}
-                  className="px-3 py-1.5 rounded-xl bg-[#211A14] hover:bg-[#2A2119] border border-[#F6EAD7]/10 text-xs font-bold text-[#E0AF62] flex items-center gap-1"
+                  className="px-3 py-1.5 rounded-full bg-[#ffffff] hover:bg-[#efeee9] border border-[#cbc6b8] text-xs font-bold text-[#54512d] flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
                 >
                   <Navigation className="w-3 h-3" /> Navigate
                 </button>
               </div>
             </div>
 
-            {/* Primary Actions: Cart & 10% Reservation */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-[#F6EAD7]/10">
+            {/* Primary Actions: Cart & In-Store Pass Reservation */}
+            <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-[#cbc6b8]/40">
               <button
                 type="button"
                 onClick={handleAddToCart}
-                className="py-3 px-5 rounded-2xl bg-[#211A14] hover:bg-[#2A2119] border border-[#F6EAD7]/15 text-xs font-bold text-[#F6EAD7] flex items-center justify-center gap-2 transition-all cursor-pointer"
+                className="py-3 px-5 rounded-full bg-[#f5f4ef] hover:bg-[#efeee9] border border-[#cbc6b8] text-xs font-bold text-[#1b1c19] flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
-                <ShoppingBag className="w-4 h-4 text-[#C8893F]" /> Add to Cart
+                <ShoppingBag className="w-4 h-4 text-[#54512d]" />
+                <span>Add to Pickup Bag</span>
               </button>
 
-              <PremiumButton
-                variant="gold"
-                size="lg"
+              <button
+                type="button"
                 onClick={() => setIsReserveModalOpen(true)}
-                className="flex-1"
-                magnetic
+                className="btn-primary-irl flex-1 text-xs py-3 shadow-md"
               >
-                Reserve Now for ₹{advanceAmount}
-              </PremiumButton>
+                <QrCode className="w-4 h-4" />
+                <span>Reserve In-Store Pass (10% Deposit) →</span>
+              </button>
             </div>
-
-            <button
-              type="button"
-              onClick={() => setShowSimilarModal(true)}
-              className="w-full mt-3 py-2.5 rounded-2xl bg-[#17120E] hover:bg-[#211A14] border border-[#C8893F]/30 text-xs font-bold text-[#E0AF62] flex items-center justify-center gap-2 transition-all cursor-pointer"
-            >
-              <Camera className="w-4 h-4 text-[#C8893F]" />
-              <span>Find Similar Styles in Nearby Shops</span>
-            </button>
           </div>
         </div>
-
-        {/* More creations from this shop */}
-        {others.length > 0 && (
-          <div className="mt-12 pt-8 border-t border-[#F6EAD7]/10">
-            <h3 className="font-serif font-bold text-lg text-[#F6EAD7] mb-4">
-              More Creations from {s.name}
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {others.map((o, oi) => (
-                <div
-                  key={o.id}
-                  onClick={() => {
-                    viewProduct(s.id, o.id);
-                    router.push(`/explorer/product/${s.id}/${o.id}`);
-                  }}
-                  className="rounded-2xl bg-[#211A14] border border-[#F6EAD7]/10 overflow-hidden hover:border-[#C8893F]/40 transition-all cursor-pointer group"
-                >
-                  <div className="aspect-square bg-[#1B140F] overflow-hidden">
-                    <img
-                      src={o.image || prodImg(o.name, oi + 10)}
-                      alt={o.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  </div>
-                  <div className="p-3">
-                    <p className="font-serif font-bold text-xs text-[#F6EAD7] group-hover:text-[#E0AF62] truncate">
-                      {o.name}
-                    </p>
-                    <p className="font-mono text-xs font-bold text-[#E0AF62] mt-1">
-                      ₹{o.price.toLocaleString('en-IN')}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Reservation Checkout Modal */}
+      {/* 10% Advance Payment & Reservation Modal */}
       {isReserveModalOpen && (
-        <ReservationModal
-          isOpen={isReserveModalOpen}
-          onClose={() => setIsReserveModalOpen(false)}
-          product={{
+        <ReservationDepositModal
+          item={{
             id: p.id,
             name: p.name,
-            price: p.price,
-            unit: p.unit,
             image: imgSrc,
-            category: p.category,
+            price: p.price,
+            shopId: s.id,
+            shopName: s.name,
+            address: s.addr,
+            phone: s.phone,
+            location: s.loc as [number, number],
           }}
-          shop={{
-            id: s.id,
-            name: s.name,
-            addr: s.addr,
-            loc: s.loc,
-          }}
-          onSuccess={(res) => {
-            setIsReserveModalOpen(false);
-            setConfirmedReservation(res);
-          }}
+          onClose={() => setIsReserveModalOpen(false)}
         />
       )}
-
-      {/* Confirmation Success Modal */}
-      {confirmedReservation && (
-        <ReservationConfirmationModal
-          isOpen={Boolean(confirmedReservation)}
-          onClose={() => setConfirmedReservation(null)}
-          reservation={confirmedReservation}
-        />
-      )}
-
-      {/* Visual Search Modal */}
-      <VisualSearchModal
-        open={showSimilarModal}
-        onOpenChange={setShowSimilarModal}
-      />
     </div>
   );
 }

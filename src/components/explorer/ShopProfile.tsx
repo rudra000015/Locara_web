@@ -225,7 +225,7 @@ export default function ShopProfile({ shopId: propShopId }: { shopId?: string })
   const customProducts = shopProducts[shop.id] || shop.products || [];
 
   return (
-    <div className="max-w-4xl mx-auto pb-16">
+    <div className="max-w-4xl mx-auto pb-32">
       {/* Back Navigation */}
       <button
         onClick={() => navTo('home')}

@@ -1,8 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppNotification } from '@/types/notification';
-import { Bell, Sparkles, Check, ChevronLeft, ArrowRight } from 'lucide-react';
+import { Bell, Sparkles, Check, ChevronLeft, ArrowRight, Tag, Store, CalendarCheck, Info } from 'lucide-react';
 
 interface Props {
   notifications: AppNotification[];
@@ -10,19 +11,6 @@ interface Props {
   liveStatus: 'idle' | 'connecting' | 'live' | 'error';
   onOpen: (notification: AppNotification) => void;
   onMarkAllRead: () => void;
-}
-
-function typeBadge(type: AppNotification['type']) {
-  if (type === 'offer') {
-    return 'bg-[#C9A96E]/15 text-[#C9A96E] border-[#C9A96E]/30';
-  }
-  if (type === 'new_product') {
-    return 'bg-[#3b82f6]/15 text-[#3b82f6] border-[#3b82f6]/30';
-  }
-  if (type === 'open_now') {
-    return 'bg-[#22c55e]/15 text-[#22c55e] border-[#22c55e]/30';
-  }
-  return 'bg-white/5 text-[#A1A1AA] border-white/10';
 }
 
 export default function NotificationsPage({
@@ -33,123 +21,141 @@ export default function NotificationsPage({
   onMarkAllRead,
 }: Props) {
   const router = useRouter();
+  const [selectedCategory, setSelectedCategory] = useState('All');
+
+  const categories = ['All', 'Reservations', 'Offers', 'Shop Updates', 'Recommendations', 'System'];
+
+  const mockItems = [
+    {
+      id: 'notif-1',
+      title: 'Your order is ready for pickup!',
+      shop: 'Hira Sweets • Chandni Chowk',
+      time: '18 min ago',
+      category: 'Reservations',
+      type: 'reservation',
+      read: false,
+    },
+    {
+      id: 'notif-2',
+      title: '20% off on Handlooms',
+      shop: 'Raghu Handlooms • Karol Bagh',
+      time: '1 hour ago',
+      category: 'Offers',
+      type: 'offer',
+      read: false,
+    },
+    {
+      id: 'notif-3',
+      title: 'New arrivals at Kundan Creations',
+      shop: 'Check out the latest bridal collection.',
+      time: '3 hours ago',
+      category: 'Shop Updates',
+      type: 'update',
+      read: true,
+    },
+    {
+      id: 'notif-4',
+      title: 'Your reservation is confirmed',
+      shop: 'LOC-8829-1029 • Ready at 6:30 PM',
+      time: '5 hours ago',
+      category: 'Reservations',
+      type: 'reservation',
+      read: true,
+    },
+  ];
+
+  const filteredItems = mockItems.filter(
+    (item) => selectedCategory === 'All' || item.category === selectedCategory
+  );
 
   return (
-    <div className="max-w-4xl mx-auto pb-12">
-      {/* Header Card */}
-      <div className="mb-6 p-6 sm:p-8 rounded-3xl bg-[#121212] border border-white/10 flex flex-wrap items-center justify-between gap-4 shadow-xl">
+    <div className="py-4 pb-20 space-y-6 max-w-3xl mx-auto">
+      {/* Header matching Mockup Screen 13 */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <Bell className="w-4 h-4 text-[#C9A96E]" />
-            <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#C9A96E]">
-              LIVE UPDATES & ALERTS
+          <div className="flex items-center gap-2 mb-1">
+            <Bell className="w-4 h-4 text-[#C8893F]" />
+            <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#C8893F]">
+              ACTIVITY TIMELINE
             </span>
           </div>
-          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#F5F5F5]">
-            Heritage Notification Feed
+          <h1 className="font-serif text-2xl sm:text-4xl font-bold text-fg-heading">
+            Notifications
           </h1>
-          <p className="text-xs text-[#71717A] mt-1">
-            {unreadCount > 0
-              ? `${unreadCount} new shop announcements waiting for you.`
-              : 'You are completely caught up with your favorite stores.'}
-          </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="px-4 py-2 rounded-2xl bg-[#181818] border border-white/10 text-right">
-            <p className="text-[9px] font-mono uppercase text-[#71717A] tracking-wider">Feed</p>
-            <div className="flex items-center gap-1.5 text-xs font-bold text-[#F5F5F5] mt-0.5">
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  liveStatus === 'live'
-                    ? 'bg-[#22c55e] animate-pulse'
-                    : liveStatus === 'connecting'
-                    ? 'bg-[#f59e0b]'
-                    : 'bg-[#71717A]'
-                }`}
-              />
-              <span className="capitalize">{liveStatus}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Control bar */}
-      <div className="flex items-center justify-between mb-4">
-        <button
-          type="button"
-          onClick={() => router.push('/explorer')}
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-[#71717A] hover:text-[#F5F5F5] transition-colors"
-        >
-          <ChevronLeft className="w-4 h-4" /> Back to explore
-        </button>
-
-        {notifications.length > 0 && (
+        {unreadCount > 0 && (
           <button
             type="button"
             onClick={onMarkAllRead}
-            className="px-3 py-1.5 rounded-xl bg-[#181818] hover:bg-[#202020] border border-white/10 text-xs font-bold text-[#C9A96E] transition-all flex items-center gap-1.5"
+            className="px-3.5 py-1.5 rounded-xl bg-bg-card hover:bg-bg-cardHover border border-border text-xs font-bold text-[#C8893F] transition-all flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
           >
             <Check className="w-3.5 h-3.5" /> Mark all as read
           </button>
         )}
       </div>
 
-      {/* List */}
-      {notifications.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-white/10 bg-[#121212] p-12 text-center shadow-sm">
-          <div className="w-14 h-14 rounded-2xl bg-[#181818] border border-white/10 flex items-center justify-center text-[#71717A] mx-auto mb-3">
-            <Bell className="w-6 h-6" />
-          </div>
-          <h3 className="font-serif text-lg font-bold text-[#F5F5F5] mb-1">No Updates Yet</h3>
-          <p className="text-xs text-[#71717A] max-w-sm mx-auto">
-            When shops you follow post new festive discounts, arrivals, or broadcasts, they will show up here in real time.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {notifications.map((notification) => (
+      {/* Filter Tabs matching Mockup Screen 13 */}
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+        {categories.map((cat) => {
+          const isSelected = selectedCategory === cat;
+          return (
             <button
-              key={notification.id}
-              type="button"
-              onClick={() => onOpen(notification)}
-              className="w-full rounded-2xl border border-white/[0.08] hover:border-white/20 bg-[#121212] hover:bg-[#161616] p-5 text-left shadow-sm transition-all duration-200 cursor-pointer group"
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all cursor-pointer ${
+                isSelected
+                  ? 'bg-[#C8893F] text-[#0E0B08] shadow-md'
+                  : 'bg-bg-pill text-fg-secondary hover:text-fg hover:bg-bg-pillHover border border-border'
+              }`}
             >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase tracking-wider border ${typeBadge(
-                        notification.type
-                      )}`}
-                    >
-                      {notification.type.replace('_', ' ')}
-                    </span>
-                    {notification.shopName && (
-                      <span className="text-xs font-bold text-[#C9A96E]">
-                        {notification.shopName}
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="font-serif font-bold text-sm sm:text-base text-[#F5F5F5] group-hover:text-[#C9A96E] transition-colors">
-                    {notification.title}
-                  </h3>
-                  <p className="text-xs text-[#A1A1AA] leading-relaxed mt-1">
-                    {notification.body}
-                  </p>
-                </div>
-
-                <div className="text-right text-[10px] font-mono text-[#71717A]">
-                  {new Date(notification.createdAt).toLocaleDateString(undefined, {
-                    month: 'short',
-                    day: 'numeric',
-                  })}
-                </div>
-              </div>
+              {cat}
             </button>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
+
+      {/* Notification Activity Cards */}
+      <div className="space-y-3">
+        {filteredItems.map((item) => (
+          <div
+            key={item.id}
+            className={`p-4 sm:p-5 rounded-2xl border transition-all flex items-center justify-between gap-4 ${
+              !item.read
+                ? 'bg-bg-card border-[#C8893F]/40 shadow-sm'
+                : 'bg-bg-card/70 border-border opacity-85'
+            }`}
+          >
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-bg-subtle border border-border flex items-center justify-center text-[#C8893F] shrink-0">
+                {item.type === 'reservation' ? (
+                  <CalendarCheck className="w-5 h-5 text-[#10B981]" />
+                ) : item.type === 'offer' ? (
+                  <Tag className="w-5 h-5 text-[#E11D48]" />
+                ) : (
+                  <Store className="w-5 h-5 text-[#C8893F]" />
+                )}
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-serif text-sm sm:text-base font-bold text-fg-heading truncate">
+                    {item.title}
+                  </h3>
+                  {!item.read && (
+                    <span className="w-2 h-2 rounded-full bg-[#E11D48] shrink-0" />
+                  )}
+                </div>
+                <p className="text-xs text-fg-muted truncate">{item.shop}</p>
+              </div>
+            </div>
+
+            <span className="text-[10px] font-mono text-fg-muted shrink-0">
+              {item.time}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -3,20 +3,23 @@ import type { ShopCategory } from '@/types/shop';
 export type CategoryId =
   | 'all'
   | 'sweets'
+  | 'bridal'
+  | 'handlooms'
+  | 'jewellery'
+  | 'handicrafts'
+  | 'spices'
+  | 'streetfood'
+  | 'footwear'
+  | 'puja'
   | 'grocery'
   | 'pharmacy'
-  | 'namkeen'
-  | 'dairy'
-  | 'bakery'
-  | 'spices'
-  | 'puja'
   | 'heritage';
 
 export interface Category {
   id: CategoryId;
   label: string;
   labelHindi: string;
-  icon: string; // Font Awesome icon name (without the `fa-` prefix)
+  icon: string; // Emoji or unicode icon
   shopCats: ShopCategory[];
   keywords: string[];
 }
@@ -39,9 +42,9 @@ export interface FilterState {
   minRating: number;
   priceRange: PriceRange;
   hours: HoursFilter;
-  openAt: string; // "HH:MM" or ""
+  openAt: string;
   discountOnly: boolean;
-  minDiscount: number; // percentage
+  minDiscount: number;
   newCollection: boolean;
 }
 
@@ -70,80 +73,88 @@ export const CATEGORIES: Category[] = [
     id: 'all',
     label: 'All',
     labelHindi: 'Sab',
-    icon: 'th-large',
+    icon: '✨',
     shopCats: ['sweets', 'grocery', 'pharmacy', 'general'],
     keywords: [],
   },
   {
     id: 'sweets',
-    label: 'Sweets',
+    label: 'Sweets & Mithai',
     labelHindi: 'Mithai',
-    icon: 'candy-cane',
+    icon: '🍬',
     shopCats: ['sweets'],
-    keywords: ['mithai', 'jalebi', 'laddu', 'barfi', 'gajak', 'rewri', 'halwai', 'sweet'],
+    keywords: ['mithai', 'jalebi', 'laddu', 'barfi', 'gajak', 'rewri', 'halwai', 'sweet', 'kaju katli'],
   },
   {
-    id: 'namkeen',
-    label: 'Namkeen',
-    labelHindi: 'Namkeen',
-    icon: 'cookie-bite',
-    shopCats: ['sweets', 'general', 'grocery'],
-    keywords: ['namkeen', 'snack', 'kachori', 'samosa', 'bhujia'],
+    id: 'bridal',
+    label: 'Bridal & Sarees',
+    labelHindi: 'Dulhan & Saree',
+    icon: '👗',
+    shopCats: ['general'],
+    keywords: ['saree', 'lehenga', 'bridal', 'couture', 'silk', 'zari', 'banarasi', 'chanderi'],
   },
   {
-    id: 'dairy',
-    label: 'Dairy',
-    labelHindi: 'Doodh',
-    icon: 'cheese',
-    shopCats: ['grocery', 'general'],
-    keywords: ['dairy', 'milk', 'paneer', 'dahi', 'ghee', 'butter'],
+    id: 'handlooms',
+    label: 'Handlooms',
+    labelHindi: 'Hathkargha',
+    icon: '🧵',
+    shopCats: ['general'],
+    keywords: ['handloom', 'khadi', 'cotton', 'pashmina', 'shawl', 'chikankari', 'weave'],
   },
   {
-    id: 'bakery',
-    label: 'Bakery',
-    labelHindi: 'Bakery',
-    icon: 'bread-slice',
-    shopCats: ['sweets', 'general', 'grocery'],
-    keywords: ['bakery', 'bread', 'cake', 'pastry', 'biscuit'],
+    id: 'jewellery',
+    label: 'Jewelry & Kundan',
+    labelHindi: 'Gehne',
+    icon: '💎',
+    shopCats: ['general'],
+    keywords: ['jewellery', 'jewelry', 'gold', 'silver', 'kundan', 'polki', 'choker', 'gem'],
+  },
+  {
+    id: 'handicrafts',
+    label: 'Handicrafts',
+    labelHindi: 'Hastkala',
+    icon: '🏺',
+    shopCats: ['general'],
+    keywords: ['crafts', 'pottery', 'wood', 'brass', 'terracotta', 'handmade', 'artisan'],
   },
   {
     id: 'spices',
-    label: 'Spices',
+    label: 'Spices & Herbs',
     labelHindi: 'Masale',
-    icon: 'pepper-hot',
+    icon: '🌶️',
     shopCats: ['grocery', 'general'],
-    keywords: ['spices', 'masala', 'mirch', 'haldi', 'dhania', 'garam'],
+    keywords: ['spices', 'masala', 'mirch', 'haldi', 'dhania', 'garam', 'saffron', 'kesar'],
+  },
+  {
+    id: 'streetfood',
+    label: 'Street Food',
+    labelHindi: 'Chaat & Khana',
+    icon: '🍲',
+    shopCats: ['sweets', 'general'],
+    keywords: ['chaat', 'kachori', 'samosa', 'chole', 'bhature', 'kulcha', 'kulfi', 'falooda'],
+  },
+  {
+    id: 'footwear',
+    label: 'Juttis & Footwear',
+    labelHindi: 'Jutti',
+    icon: '👡',
+    shopCats: ['general'],
+    keywords: ['jutti', 'mojari', 'sandals', 'leather', 'footwear', 'shoes'],
   },
   {
     id: 'puja',
-    label: 'Puja',
-    labelHindi: 'Puja',
-    icon: 'om',
+    label: 'Puja Essentials',
+    labelHindi: 'Puja Samagri',
+    icon: '🪔',
     shopCats: ['general', 'grocery'],
-    keywords: ['puja', 'pooja', 'dhoop', 'agarbatti', 'diya', 'kumkum'],
-  },
-  {
-    id: 'grocery',
-    label: 'Grocery',
-    labelHindi: 'Kirana',
-    icon: 'shopping-basket',
-    shopCats: ['grocery', 'general'],
-    keywords: ['kirana', 'grocery', 'atta', 'dal', 'spices', 'rice'],
-  },
-  {
-    id: 'pharmacy',
-    label: 'Pharmacy',
-    labelHindi: 'Dawai',
-    icon: 'capsules',
-    shopCats: ['pharmacy'],
-    keywords: ['medical', 'pharmacy', 'chemist', 'dawai', 'medicine'],
+    keywords: ['puja', 'pooja', 'dhoop', 'agarbatti', 'diya', 'kumkum', 'brass diya'],
   },
   {
     id: 'heritage',
-    label: 'Heritage',
+    label: 'Centennial Legacy',
     labelHindi: 'Virasat',
-    icon: 'landmark',
+    icon: '🏛️',
     shopCats: ['sweets', 'grocery', 'pharmacy', 'general'],
-    keywords: ['since', 'est', 'old', 'heritage', 'traditional', 'purana'],
+    keywords: ['since', 'est', 'old', 'heritage', 'traditional', 'purana', 'century'],
   },
 ];

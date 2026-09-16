@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Festival, FestivalOffer, getTimeUntilFestival } from '@/data/festivals';
+import { Festival, FestivalOffer, getTimeUntilFestival, FESTIVALS, getFestivalBySlug } from '@/data/festivals';
 import { useStore } from '@/store/useStore';
 import {
   ChevronLeft,
@@ -64,9 +64,16 @@ function Countdown({ festival }: { festival: Festival }) {
   );
 }
 
-export default function FestivalPage({ festival }: { festival: Festival }) {
+interface FestivalPageProps {
+  festival?: Festival;
+  slug?: string;
+}
+
+export default function FestivalPage({ festival: propFestival, slug }: FestivalPageProps) {
   const router = useRouter();
   const { openShop } = useStore();
+
+  const festival = propFestival || (slug ? getFestivalBySlug(slug) : null) || FESTIVALS[0];
 
   const handleShare = () => {
     if (navigator.share) {

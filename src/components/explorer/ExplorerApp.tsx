@@ -210,10 +210,10 @@ export default function ExplorerApp({ routePage }: { routePage: ExplorerRoutePag
   const profileCard = (
     <div className="mx-auto max-w-2xl space-y-6 pb-12">
       {/* User Overview */}
-      <div className="rounded-3xl border border-[#F6EAD7]/10 bg-[#17120E] p-6 sm:p-8 shadow-xl">
+      <div className="rounded-2xl border border-[rgba(72,55,47,0.12)] bg-[#ffffff] p-6 sm:p-8 shadow-[0_12px_32px_-4px_rgba(72,55,47,0.06)]">
         <div className="flex items-center gap-2 mb-2">
-          <Sparkles className="w-4 h-4 text-[#C8893F]" />
-          <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#C8893F]">
+          <Sparkles className="w-4 h-4 text-[#54512d]" />
+          <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#54512d] font-bold">
             EXPLORER PROFILE & SAVED GEMS
           </span>
         </div>
@@ -222,52 +222,52 @@ export default function ExplorerApp({ routePage }: { routePage: ExplorerRoutePag
           <img
             src={effectiveUser.img}
             alt={effectiveUser.name}
-            className="h-20 w-20 rounded-3xl border-2 border-[#C8893F]/40 bg-[#211A14] object-cover shadow-glow-sm shrink-0"
+            className="h-20 w-20 rounded-2xl border border-[rgba(72,55,47,0.15)] bg-[#f5f4ef] object-cover shrink-0"
           />
           <div className="text-center sm:text-left min-w-0 flex-1">
-            <h2 className="font-serif text-2xl font-bold text-[#F6EAD7]">{effectiveUser.name}</h2>
-            <p className="text-xs text-[#9E8B75] mt-0.5">{effectiveUser.email || 'Verified Explorer Account'}</p>
-            <span className="inline-block mt-2 px-3 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#C8893F]/15 text-[#E0AF62] border border-[#C8893F]/30">
-              {effectiveUser.role} Member
+            <h2 className="font-serif text-2xl font-bold text-[#1b1c19]">{effectiveUser.name}</h2>
+            <p className="text-xs text-[#49473c] mt-0.5">{effectiveUser.email || 'Verified Explorer Account'}</p>
+            <span className="inline-block mt-2 px-3 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#efeee9] text-[#54512d] border border-[#cbc6b8]">
+              {effectiveUser.role} Member • Level 3 Explorer
             </span>
           </div>
         </div>
 
         {/* Quick Stats Grid */}
         <div className="grid grid-cols-3 gap-3 my-6 text-center">
-          <div className="p-3 rounded-2xl bg-[#211A14] border border-[#F6EAD7]/5">
-            <p className="font-serif text-xl font-bold text-[#F6EAD7]">{wishlist.length}</p>
-            <p className="text-[10px] text-[#9E8B75] mt-0.5">Saved Products</p>
+          <div className="p-3 rounded-xl bg-[#f5f4ef] border border-[rgba(72,55,47,0.08)]">
+            <p className="font-serif text-xl font-bold text-[#1b1c19]">{wishlist.length}</p>
+            <p className="text-[10px] text-[#7a776b] mt-0.5">Saved Gems</p>
           </div>
-          <div className="p-3 rounded-2xl bg-[#211A14] border border-[#F6EAD7]/5">
-            <p className="font-serif text-xl font-bold text-[#E0AF62]">{cart.length}</p>
-            <p className="text-[10px] text-[#9E8B75] mt-0.5">Cart Items</p>
+          <div className="p-3 rounded-xl bg-[#f5f4ef] border border-[rgba(72,55,47,0.08)]">
+            <p className="font-serif text-xl font-bold text-[#54512d]">{cart.length}</p>
+            <p className="text-[10px] text-[#7a776b] mt-0.5">Active Passes</p>
           </div>
-          <div className="p-3 rounded-2xl bg-[#211A14] border border-[#F6EAD7]/5">
-            <p className="font-serif text-xl font-bold text-[#2D7D64]">Active</p>
-            <p className="text-[10px] text-[#9E8B75] mt-0.5">In-Store Status</p>
+          <div className="p-3 rounded-xl bg-[#f5f4ef] border border-[rgba(72,55,47,0.08)]">
+            <p className="font-serif text-xl font-bold text-[#6d6943]">350</p>
+            <p className="text-[10px] text-[#7a776b] mt-0.5">Explorer Pts</p>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="space-y-3 pt-4 border-t border-[#F6EAD7]/10">
+        <div className="space-y-3 pt-4 border-t border-[#cbc6b8]/40">
           <button
             type="button"
             onClick={() => navTo('reservations')}
-            className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-[#211A14] hover:bg-[#2A2119] border border-[#F6EAD7]/10 text-xs font-bold text-[#F6EAD7] transition-all cursor-pointer"
+            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-[#f5f4ef] hover:bg-[#efeee9] border border-[#cbc6b8]/60 text-xs font-bold text-[#1b1c19] transition-all cursor-pointer"
           >
             <span className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-[#C8893F]" /> View My Active In-Store Reservations
+              <Calendar className="w-4 h-4 text-[#54512d]" /> View My In-Store Offline Passes
             </span>
-            <span className="text-[#E0AF62]">→</span>
+            <span className="text-[#54512d]">→</span>
           </button>
 
           <button
             type="button"
             onClick={handleListYourShop}
-            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#C8893F] hover:bg-[#E0AF62] py-3.5 text-xs font-bold text-[#0E0B08] transition-all shadow-glow-sm cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 rounded-full bg-[#54512d] hover:bg-[#3f3d22] py-3.5 text-xs font-bold text-[#ffffff] transition-all shadow-md cursor-pointer"
           >
-            <Store className="w-4 h-4" /> Switch to Merchant / Store Owner Console
+            <Store className="w-4 h-4" /> Switch to Store Owner Console
           </button>
 
           <button
@@ -276,7 +276,7 @@ export default function ExplorerApp({ routePage }: { routePage: ExplorerRoutePag
               logout();
               router.push('/');
             }}
-            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#211A14] hover:bg-[#2A2119] border border-[#F6EAD7]/10 py-3 text-xs font-bold text-[#C24136] transition-all cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 rounded-full bg-[#f5f4ef] hover:bg-[#efeee9] border border-[#cbc6b8] py-3 text-xs font-bold text-[#ba1a1a] transition-all cursor-pointer"
           >
             <LogOut className="w-4 h-4" /> Sign Out
           </button>
@@ -304,7 +304,7 @@ export default function ExplorerApp({ routePage }: { routePage: ExplorerRoutePag
       case 'product':
         return <ProductDetail />;
       case 'market':
-        return <MarketDetailPage slug={currentMarketSlug || 'karol-bagh'} />;
+        return <MarketDetailPage slug={currentMarketSlug || 'indiranagar-100ft'} />;
       case 'cart':
         return <CartPage />;
       case 'reservations':
@@ -352,7 +352,7 @@ export default function ExplorerApp({ routePage }: { routePage: ExplorerRoutePag
   };
 
   return (
-    <div className="min-h-screen bg-[#0E0B08] text-[#F6EAD7]">
+    <div className="min-h-screen bg-[#faf9f4] text-[#1b1c19]">
       <IntroBanner city={useGps ? 'Your Area' : selectedCity} />
       <ExplorerHeader
         query={query}
@@ -378,27 +378,27 @@ export default function ExplorerApp({ routePage }: { routePage: ExplorerRoutePag
 
       {/* Arrival Detected Modal */}
       {arrivalPromptVisible && activeTrip && (
-        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-          <div className="w-full max-w-md rounded-3xl border border-[#C8893F]/40 bg-[#17120E] p-6 shadow-2xl animate-scale-in text-center">
-            <div className="w-14 h-14 rounded-3xl bg-[#1E5544]/25 border border-[#1E5544]/50 flex items-center justify-center text-[#2D7D64] mx-auto mb-3 shadow-glow-emerald">
-              <MapPin className="w-7 h-7 text-[#2D7D64]" />
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-[#1b1c19]/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-[rgba(72,55,47,0.15)] bg-[#ffffff] p-6 shadow-2xl animate-scale-in text-center">
+            <div className="w-14 h-14 rounded-full bg-[#f0e9ba] border border-[#54512d]/30 flex items-center justify-center text-[#54512d] mx-auto mb-3">
+              <MapPin className="w-7 h-7 text-[#54512d]" />
             </div>
 
-            <p className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#E0AF62]">
+            <p className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#54512d]">
               STORE ARRIVAL DETECTED
             </p>
-            <h3 className="mt-1 font-serif text-2xl font-bold text-[#F6EAD7]">
-              Looks like you&apos;ve arrived at {activeTrip.shopName}
+            <h3 className="mt-1 font-serif text-2xl font-bold text-[#1b1c19]">
+              You&apos;ve arrived at {activeTrip.shopName}
             </h3>
-            <p className="mt-2 text-xs leading-relaxed text-[#9E8B75]">
-              Show your reservation QR code or 6-digit OTP at the billing counter to verify pickup.
+            <p className="mt-2 text-xs leading-relaxed text-[#49473c]">
+              Show your reservation QR pass or 6-digit OTP at the billing counter to verify pickup.
             </p>
 
             <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
               <button
                 type="button"
                 onClick={() => clearTrip()}
-                className="flex-1 rounded-2xl border border-[#F6EAD7]/10 px-4 py-3 text-xs font-bold text-[#9E8B75] hover:bg-white/5 cursor-pointer"
+                className="flex-1 rounded-full border border-[#cbc6b8] px-4 py-3 text-xs font-bold text-[#49473c] hover:bg-[#f5f4ef] cursor-pointer"
               >
                 Not Yet
               </button>
@@ -409,9 +409,9 @@ export default function ExplorerApp({ routePage }: { routePage: ExplorerRoutePag
                   clearTrip();
                   navTo('reservations');
                 }}
-                className="flex-1 rounded-2xl bg-[#C8893F] hover:bg-[#E0AF62] px-4 py-3 text-xs font-bold text-[#0E0B08] shadow-glow-sm cursor-pointer"
+                className="flex-1 rounded-full bg-[#48372f] hover:bg-[#3d2d26] px-4 py-3 text-xs font-bold text-[#faf9f4] shadow-md cursor-pointer"
               >
-                Open Pickup QR Code
+                Open Pickup Pass
               </button>
             </div>
           </div>

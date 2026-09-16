@@ -87,16 +87,16 @@ export default function CartPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto pb-16">
+    <div className="max-w-4xl mx-auto pb-32">
       {/* Header */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-[#17120E] border border-[#F6EAD7]/10 mb-6 shadow-xl">
+      <div className="p-4 sm:p-8 rounded-3xl bg-[#17120E] border border-[#F6EAD7]/10 mb-6 shadow-xl">
         <div className="flex items-center gap-2 mb-1.5">
           <ShoppingBag className="w-4 h-4 text-[#C8893F]" />
           <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#C8893F]">
             IN-STORE PICKUP CART
           </span>
         </div>
-        <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#F6EAD7]">
+        <h1 className="font-serif text-xl sm:text-3xl font-bold text-[#F6EAD7]">
           Your Shopping Cart
         </h1>
         <p className="text-xs text-[#9E8B75] mt-1">

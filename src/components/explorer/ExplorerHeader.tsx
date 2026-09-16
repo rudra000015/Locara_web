@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useStore } from '@/store/useStore';
 import { useExplorerRuntimeStore } from '@/store/useExplorerRuntimeStore';
 import { usePathname, useRouter } from 'next/navigation';
@@ -9,6 +9,7 @@ import { CATEGORIES, FilterState } from '@/data/categories';
 import FilterPanel from './FilterPanel';
 import VisualSearchModal from './VisualSearchModal';
 import CommandPalette from '@/components/ui/CommandPalette';
+import ThemeToggle from '@/components/ui/ThemeToggle';
 import {
   Search,
   SlidersHorizontal,
@@ -22,6 +23,9 @@ import {
   Command,
   ShoppingBag,
   CalendarCheck,
+  User,
+  LogOut,
+  X,
 } from 'lucide-react';
 
 interface Props {
@@ -57,21 +61,23 @@ export default function ExplorerHeader({
   const [locationOpen, setLocationOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showVisual, setShowVisual] = useState(false);
-  const [showLens, setShowLens] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
-  const POPULAR = ['Karol Bagh Lehengas', 'Hira Sweets', 'Jalebi', 'Banarasi Silk', 'Chinar Crafts', 'Kundan Jewellery'];
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const POPULAR = ['Banarasi Silk', 'Hira Sweets', 'Chandni Chowk', 'Kundan Jewellery', 'Kaju Katli', 'Chinar Crafts'];
   const unreadNotifications = notifications.filter((item) => !readIds.includes(item.id)).length;
   const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-
-  const activeFilterCount = [
-    filters.category !== 'all',
-    filters.sort !== 'relevance',
-    filters.openNow,
-    filters.minRating > 0,
-    filters.priceRange !== 'all',
-  ].filter(Boolean).length;
 
   const handleSearch = (val: string) => {
     onQueryChange(val);
@@ -82,62 +88,88 @@ export default function ExplorerHeader({
     if (val.length === 0) onRefetch();
   };
 
+  const navLinks = [
+    { label: 'Discover', href: '/', id: 'home' },
+    { label: 'Markets', href: '/markets', id: 'markets' },
+    { label: 'Shops', href: '/shops', id: 'shops' },
+    { label: 'Map', href: '/map', id: 'map' },
+    { label: 'Stories', href: '/stories', id: 'stories' },
+    { label: 'For Shops', href: '/owner', id: 'owner' },
+  ];
+
   return (
     <>
-      <header className="sticky top-0 z-40 bg-[#0E0B08]/90 backdrop-blur-2xl border-b border-[#F6EAD7]/10 transition-all duration-300">
+      <header
+        className={`sticky top-0 z-40 bg-bg-header backdrop-blur-2xl border-b border-border transition-all duration-300 ${scrolled ? 'py-1 shadow-xl' : 'py-1.5 sm:py-2'
+          }`}
+      >
         <div className="max-w-7xl mx-auto px-3 sm:px-6">
-          {/* Row 1: Logo, Location, Command Search, Actions */}
-          <div className="flex items-center justify-between gap-3 h-16">
-            {/* Logo */}
+          {/* Main Top Row */}
+          <div className="flex items-center justify-between gap-2 sm:gap-4 h-13 sm:h-16">
+            {/* Logo & Slogan */}
             <button
               onClick={() => {
                 navTo('home');
-                router.push('/explorer');
+                router.push('/');
               }}
-              className="flex items-center gap-2.5 bg-transparent border-none cursor-pointer shrink-0 text-left group"
+              className="flex items-center gap-2 sm:gap-3 bg-transparent border-none cursor-pointer shrink-0 text-left group"
             >
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#261D16] to-[#1B140F] border border-[#C8893F]/40 flex items-center justify-center shadow-sm group-hover:border-[#C8893F] transition-colors">
-                <Store className="w-4 h-4 text-[#C8893F]" />
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-bg-card2 border border-[#C8893F]/40 flex items-center justify-center shadow-sm group-hover:border-[#C8893F] transition-all">
+                <Store className="w-4 h-4 sm:w-5 sm:h-5 text-[#C8893F]" />
               </div>
-              <div className="hidden sm:block">
-                <p className="font-serif text-base font-bold text-[#F6EAD7] leading-tight tracking-wide group-hover:text-white transition-colors">
+              <div>
+                <p className="font-serif text-base sm:text-lg font-black tracking-wider text-fg-heading leading-tight group-hover:text-[#C8893F] transition-colors">
                   LOCARA
                 </p>
-                <p className="text-[9px] font-mono tracking-[0.18em] uppercase text-[#E0AF62]">
-                  Hyperlocal Commerce
+                <p className="text-[7.5px] sm:text-[9px] font-mono tracking-[0.2em] sm:tracking-[0.25em] uppercase text-[#C8893F] font-bold">
+                  PLACES • PEOPLE • STORIES
                 </p>
               </div>
             </button>
 
-            {/* Location Selector (Desktop/Tablet) */}
-            <button
-              onClick={() => setLocationOpen(true)}
-              className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#17120E] border border-[#F6EAD7]/10 hover:border-[#C8893F]/40 hover:bg-[#211A14] transition-all cursor-pointer shrink-0"
-            >
-              <MapPin className="w-3.5 h-3.5 text-[#C8893F]" />
-              <div className="text-left">
-                <p className="text-[9px] font-mono uppercase tracking-wider text-[#9E8B75] leading-none">
-                  Location
-                </p>
-                <p className="text-xs font-bold text-[#F6EAD7] leading-tight">{selectedCity}, IN</p>
-              </div>
-              <ChevronDown className="w-3 h-3 text-[#9E8B75]" />
-            </button>
+            {/* Desktop Navigation Links (Hidden on Mobile) */}
+            <nav className="hidden lg:flex items-center gap-1.5 shrink-0">
+              {navLinks.map((link) => {
+                const isActive =
+                  pathname === link.href ||
+                  (link.href !== '/' && pathname.startsWith(link.href));
+                return (
+                  <button
+                    key={link.id}
+                    onClick={() => {
+                      if (link.id === 'owner') {
+                        router.push('/owner');
+                      } else {
+                        navTo(link.id as any);
+                        router.push(link.href);
+                      }
+                    }}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all relative cursor-pointer ${isActive
+                        ? 'text-[#C8893F] bg-bg-pill shadow-sm'
+                        : 'text-fg-secondary hover:text-fg hover:bg-bg-cardHover'
+                      }`}
+                  >
+                    {link.label}
+                    {isActive && (
+                      <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-[#C8893F]" />
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
 
-            {/* Central Search Bar with Quick Trigger */}
-            <div className="flex-1 max-w-xl relative mx-2 min-w-0">
+            {/* Desktop Central Search Bar (Hidden on Mobile) */}
+            <div className="hidden md:flex flex-1 max-w-md relative mx-2 min-w-0">
               <div
-                className={`flex items-center gap-2.5 px-3.5 h-10 rounded-xl bg-[#17120E] border transition-all duration-200 ${
-                  focused
-                    ? 'border-[#C8893F] ring-2 ring-[#C8893F]/20 bg-[#211A14]'
-                    : 'border-[#F6EAD7]/10 hover:border-[#F6EAD7]/20'
-                }`}
+                className={`flex items-center gap-2.5 px-3.5 h-10 w-full rounded-xl bg-bg-card border transition-all duration-200 ${focused
+                    ? 'border-[#C8893F] ring-2 ring-[#C8893F]/20 bg-bg-cardHover'
+                    : 'border-border hover:border-[#C8893F]/40'
+                  }`}
                 onClick={() => inputRef.current?.focus()}
               >
                 <Search
-                  className={`w-4 h-4 shrink-0 transition-colors ${
-                    focused ? 'text-[#C8893F]' : 'text-[#9E8B75]'
-                  }`}
+                  className={`w-4 h-4 shrink-0 transition-colors ${focused ? 'text-[#C8893F]' : 'text-fg-muted'
+                    }`}
                 />
                 <input
                   ref={inputRef}
@@ -146,8 +178,8 @@ export default function ExplorerHeader({
                   onChange={(e) => handleSearch(e.target.value)}
                   onFocus={() => setFocused(true)}
                   onBlur={() => setTimeout(() => setFocused(false), 200)}
-                  placeholder="Search products, shops, markets..."
-                  className="flex-1 bg-transparent text-xs sm:text-sm text-[#F6EAD7] placeholder-[#9E8B75] outline-none font-medium min-w-0"
+                  placeholder="Search markets, shops & products..."
+                  className="flex-1 bg-transparent text-xs sm:text-sm text-fg placeholder-fg-muted outline-none font-medium min-w-0"
                 />
 
                 {query && (
@@ -157,34 +189,32 @@ export default function ExplorerHeader({
                       onQueryChange('');
                       onRefetch();
                     }}
-                    className="text-[#9E8B75] hover:text-[#F6EAD7] text-sm px-1"
+                    className="text-fg-muted hover:text-fg text-sm px-1"
                   >
                     ×
                   </button>
                 )}
 
-                {/* Command palette hint */}
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowCommandPalette(true);
                   }}
-                  className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#211A14] border border-[#F6EAD7]/10 text-[10px] font-mono text-[#9E8B75] hover:text-[#F6EAD7]"
+                  className="hidden xl:flex items-center gap-1 px-1.5 py-0.5 rounded bg-bg-pill border border-border text-[10px] font-mono text-fg-muted hover:text-fg"
                   title="Open Command Palette (Cmd+K)"
                 >
                   <Command className="w-2.5 h-2.5" /> K
                 </button>
 
-                {/* Lens search camera icon */}
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setShowLens(true);
+                    router.push('/visual-search');
                   }}
-                  title="Search with Camera"
-                  className="w-7 h-7 rounded-lg bg-[#211A14] hover:bg-[#2A2119] text-[#C8893F] flex items-center justify-center shrink-0 transition-colors"
+                  title="Search with AI Camera"
+                  className="w-7 h-7 rounded-lg bg-bg-pill hover:bg-bg-pillHover text-[#C8893F] flex items-center justify-center shrink-0 transition-colors cursor-pointer"
                 >
                   <Camera className="w-3.5 h-3.5" />
                 </button>
@@ -192,10 +222,10 @@ export default function ExplorerHeader({
 
               {/* Instant Search Dropdown */}
               {focused && !query && (
-                <div className="absolute top-[calc(100%+6px)] left-0 right-0 bg-[#17120E] border border-[#F6EAD7]/10 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-72 overflow-y-auto no-scrollbar">
+                <div className="absolute top-[calc(100%+6px)] left-0 right-0 bg-bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden max-h-72 overflow-y-auto no-scrollbar">
                   {searchHistory.length > 0 && (
-                    <div className="p-2 border-b border-[#F6EAD7]/5">
-                      <p className="px-2 py-1 text-[10px] font-mono uppercase text-[#9E8B75] tracking-wider">
+                    <div className="p-2 border-b border-border/50">
+                      <p className="px-2 py-1 text-[10px] font-mono uppercase text-fg-muted tracking-wider">
                         Recent Searches
                       </p>
                       {searchHistory.slice(0, 3).map((h) => (
@@ -205,16 +235,16 @@ export default function ExplorerHeader({
                             onQueryChange(h);
                             setFocused(false);
                           }}
-                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-[#D8C4A7] hover:text-[#F6EAD7] hover:bg-[#211A14] text-left transition-colors"
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-fg-secondary hover:text-fg hover:bg-bg-cardHover text-left transition-colors"
                         >
-                          <span className="text-[#9E8B75]">↺</span> {h}
+                          <span className="text-fg-muted">↺</span> {h}
                         </button>
                       ))}
                     </div>
                   )}
 
                   <div className="p-2">
-                    <p className="px-2 py-1 text-[10px] font-mono uppercase text-[#E0AF62] tracking-wider font-bold">
+                    <p className="px-2 py-1 text-[10px] font-mono uppercase text-[#C8893F] tracking-wider font-bold">
                       Trending Searches
                     </p>
                     <div className="flex flex-wrap gap-1.5 p-1">
@@ -225,7 +255,7 @@ export default function ExplorerHeader({
                             onQueryChange(p);
                             setFocused(false);
                           }}
-                          className="px-2.5 py-1 rounded-lg bg-[#211A14] hover:bg-[#2A2119] text-xs text-[#F6EAD7] border border-[#F6EAD7]/10 transition-colors"
+                          className="px-2.5 py-1 rounded-lg bg-bg-pill hover:bg-bg-pillHover text-xs text-fg border border-border transition-colors"
                         >
                           {p}
                         </button>
@@ -237,130 +267,196 @@ export default function ExplorerHeader({
             </div>
 
             {/* Right Action Icons */}
-            <div className="flex items-center gap-2 shrink-0">
-              {/* Filter Button */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {/* Mobile Search Icon Toggle */}
               <button
-                onClick={() => setShowFilters(true)}
-                title="Filters"
-                className={`relative w-9 h-9 rounded-xl flex items-center justify-center border transition-all cursor-pointer ${
-                  activeFilterCount > 0
-                    ? 'bg-[#C8893F]/20 border-[#C8893F] text-[#E0AF62]'
-                    : 'bg-[#17120E] border-[#F6EAD7]/10 text-[#D8C4A7] hover:text-[#F6EAD7] hover:bg-[#211A14]'
-                }`}
+                type="button"
+                onClick={() => setMobileSearchOpen(!mobileSearchOpen)}
+                className="md:hidden w-8 h-8 rounded-xl flex items-center justify-center bg-bg-card border border-border text-fg-secondary hover:text-fg cursor-pointer"
+                title="Search"
               >
-                <SlidersHorizontal className="w-4 h-4" />
-                {activeFilterCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#C8893F] text-[#0E0B08] font-bold text-[9px] flex items-center justify-center">
-                    {activeFilterCount}
-                  </span>
-                )}
+                <Search className="w-4 h-4" />
               </button>
 
-              {/* Cart Button */}
+              {/* Mobile AI Camera Trigger */}
               <button
-                onClick={() => navTo('cart')}
+                type="button"
+                onClick={() => router.push('/visual-search')}
+                className="md:hidden w-8 h-8 rounded-xl flex items-center justify-center bg-bg-card border border-[#C8893F]/40 text-[#C8893F] cursor-pointer"
+                title="AI Camera"
+              >
+                <Camera className="w-4 h-4" />
+              </button>
+
+              {/* Location Selector Pill */}
+              <button
+                onClick={() => setLocationOpen(true)}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-bg-card border border-border hover:border-[#C8893F]/40 hover:bg-bg-cardHover transition-all cursor-pointer shrink-0"
+              >
+                <MapPin className="w-3.5 h-3.5 text-[#C8893F]" />
+                <span className="text-xs font-bold text-fg max-w-[65px] sm:max-w-none truncate">
+                  {selectedCity}
+                </span>
+                <ChevronDown className="w-3 h-3 text-fg-muted" />
+              </button>
+
+              {/* Theme Toggle Button */}
+              <ThemeToggle />
+
+              {/* Desktop Only: Cart / Wishlist / Notification (On Mobile, these live in the bottom bar or profile) */}
+              <button
+                onClick={() => {
+                  navTo('cart');
+                  router.push('/cart');
+                }}
                 title="In-Store Pickup Cart"
-                className="relative w-9 h-9 rounded-xl flex items-center justify-center bg-[#17120E] border border-[#F6EAD7]/10 text-[#D8C4A7] hover:text-[#F6EAD7] hover:bg-[#211A14] transition-all cursor-pointer"
+                className="hidden md:flex relative w-9 h-9 rounded-xl items-center justify-center bg-bg-card border border-border text-fg-secondary hover:text-fg hover:bg-bg-cardHover transition-all cursor-pointer"
               >
                 <ShoppingBag className="w-4 h-4" />
                 {totalCartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#C8893F] text-[#0E0B08] font-black text-[9px] flex items-center justify-center leading-none">
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#C8893F] text-[#0E0B08] font-black text-[9px] flex items-center justify-center leading-none shadow-sm">
                     {totalCartCount}
                   </span>
                 )}
               </button>
 
-              {/* Reservations Button */}
               <button
-                onClick={() => navTo('reservations')}
-                title="Active Reservations"
-                className="relative w-9 h-9 rounded-xl flex items-center justify-center bg-[#17120E] border border-[#F6EAD7]/10 text-[#D8C4A7] hover:text-[#F6EAD7] hover:bg-[#211A14] transition-all cursor-pointer"
-              >
-                <CalendarCheck className="w-4 h-4" />
-              </button>
-
-              {/* Wishlist Button */}
-              <button
-                onClick={() => navTo('wishlist')}
-                title="Saved Gems"
-                className="relative w-9 h-9 rounded-xl flex items-center justify-center bg-[#17120E] border border-[#F6EAD7]/10 text-[#D8C4A7] hover:text-[#F6EAD7] hover:bg-[#211A14] transition-all cursor-pointer"
-              >
-                <Heart
-                  className={`w-4 h-4 ${
-                    wishlist.length > 0 ? 'text-[#C24136] fill-[#C24136]' : ''
-                  }`}
-                />
-                {wishlist.length > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#C24136] text-white font-black text-[9px] flex items-center justify-center leading-none">
-                    {wishlist.length}
-                  </span>
-                )}
-              </button>
-
-              {/* Notifications Button */}
-              <button
-                onClick={() => navTo('notifications')}
+                onClick={() => {
+                  navTo('notifications');
+                  router.push('/notifications');
+                }}
                 title="Notifications"
-                className="relative w-9 h-9 rounded-xl flex items-center justify-center bg-[#17120E] border border-[#F6EAD7]/10 text-[#D8C4A7] hover:text-[#F6EAD7] hover:bg-[#211A14] transition-all cursor-pointer"
+                className="hidden md:flex relative w-9 h-9 rounded-xl items-center justify-center bg-bg-card border border-border text-fg-secondary hover:text-fg hover:bg-bg-cardHover transition-all cursor-pointer"
               >
                 <Bell className="w-4 h-4" />
                 {unreadNotifications > 0 && (
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#E0AF62] shadow-glow" />
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#E11D48] shadow-glow" />
                 )}
               </button>
 
-              {/* Profile / Logout Avatar */}
-              <button
-                onClick={() => {
-                  logout();
-                  router.push('/');
-                }}
-                title={user ? `${user.name} (Click to Logout / Switch Role)` : 'Sign In'}
-                className="w-9 h-9 rounded-xl bg-[#211A14] border border-[#F6EAD7]/15 overflow-hidden flex items-center justify-center cursor-pointer hover:border-[#C8893F] transition-colors"
-              >
-                {user?.img ? (
-                  <img src={user.img} alt={user.name} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-xs font-bold text-[#E0AF62]">U</span>
+              {/* Profile / Account Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-bg-card border border-border overflow-hidden flex items-center justify-center cursor-pointer hover:border-[#C8893F] transition-colors"
+                  title="Profile & Settings"
+                >
+                  {user?.img ? (
+                    <img src={user.img} alt={user.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-4 h-4 text-[#C8893F]" />
+                  )}
+                </button>
+
+                {profileDropdownOpen && (
+                  <div className="absolute right-0 top-10 sm:top-11 w-56 bg-bg-card border border-border rounded-2xl p-2 shadow-2xl z-50 animate-scale-in">
+                    <div className="px-3 py-2 border-b border-border">
+                      <p className="text-xs font-bold text-fg-heading truncate">{user?.name || 'Locara Explorer'}</p>
+                      <p className="text-[10px] text-fg-muted truncate">{user?.email || 'Verified Member'}</p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setProfileDropdownOpen(false);
+                        navTo('profile');
+                        router.push('/profile');
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-fg hover:bg-bg-cardHover text-left"
+                    >
+                      <User className="w-3.5 h-3.5 text-[#C8893F]" />
+                      Profile & Settings
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setProfileDropdownOpen(false);
+                        navTo('reservations');
+                        router.push('/reservations');
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-fg hover:bg-bg-cardHover text-left"
+                    >
+                      <CalendarCheck className="w-3.5 h-3.5 text-[#C8893F]" />
+                      My Reservations
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setProfileDropdownOpen(false);
+                        router.push('/owner');
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-[#54512d] hover:bg-bg-cardHover text-left"
+                    >
+                      <Store className="w-3.5 h-3.5" />
+                      Shop Owner Workspace
+                    </button>
+
+                    <div className="my-1 border-t border-border" />
+
+                    <button
+                      onClick={() => {
+                        setProfileDropdownOpen(false);
+                        logout();
+                        router.push('/');
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-[#E11D48] hover:bg-bg-cardHover text-left"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      Sign Out
+                    </button>
+                  </div>
                 )}
-              </button>
+              </div>
             </div>
           </div>
 
-          {/* Row 2: Category Navigation Ribbon */}
-          <div className="flex items-center gap-1.5 pb-2.5 overflow-x-auto no-scrollbar">
-            {/* Desktop Quick Nav Links */}
-            <div className="hidden lg:flex items-center gap-1 shrink-0 pr-2 border-r border-[#F6EAD7]/10 mr-1">
-              {[
-                { label: 'Markets', action: () => navTo('home') },
-                { label: 'Map Discovery', action: () => navTo('map') },
-                { label: 'Reservations', action: () => navTo('reservations') },
-                { label: 'Cart', action: () => navTo('cart') },
-                { label: 'Saved', action: () => navTo('wishlist') },
-              ].map((nav, i) => (
+          {/* Mobile Search Bar Dropdown (when toggled on mobile) */}
+          {mobileSearchOpen && (
+            <div className="md:hidden py-2 border-t border-border/50 animate-scale-in">
+              <div className="flex items-center gap-2 px-3 h-9 rounded-xl bg-bg-card border border-[#C8893F]/40">
+                <Search className="w-3.5 h-3.5 text-[#C8893F] shrink-0" />
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  autoFocus
+                  placeholder="Search shops, lehengas, sweets..."
+                  className="flex-1 bg-transparent text-xs text-fg placeholder-fg-muted outline-none"
+                />
+                {query && (
+                  <button
+                    onClick={() => {
+                      onQueryChange('');
+                      onRefetch();
+                    }}
+                    className="text-fg-muted text-xs p-1"
+                  >
+                    ×
+                  </button>
+                )}
                 <button
-                  key={i}
-                  onClick={nav.action}
-                  className="px-3 py-1 rounded-lg text-xs font-bold text-[#D8C4A7] hover:text-[#F6EAD7] hover:bg-[#211A14] transition-all"
+                  onClick={() => setMobileSearchOpen(false)}
+                  className="text-fg-muted hover:text-fg text-xs p-1"
                 >
-                  {nav.label}
+                  <X className="w-3.5 h-3.5" />
                 </button>
-              ))}
+              </div>
             </div>
+          )}
 
-            {/* Category Ribbon */}
+          {/* Row 2: Category Ribbon with Clean Emojis & Badges */}
+          <div className="flex items-center gap-1.5 sm:gap-2 py-1.5 sm:py-2 overflow-x-auto no-scrollbar border-t border-border/50">
             {CATEGORIES.map((cat) => {
               const active = filters.category === cat.id;
               return (
                 <button
                   key={cat.id}
                   onClick={() => onFiltersChange({ ...filters, category: cat.id })}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold shrink-0 transition-all cursor-pointer ${
-                    active
-                      ? 'bg-[#C8893F] text-[#0E0B08] font-bold shadow-glow-sm'
-                      : 'bg-[#17120E] text-[#D8C4A7] hover:text-[#F6EAD7] hover:bg-[#211A14] border border-[#F6EAD7]/5'
-                  }`}
+                  className={`flex items-center gap-1 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-bold shrink-0 transition-all cursor-pointer ${active
+                      ? 'bg-[#C8893F] text-[#0E0B08] shadow-md shadow-[#C8893F]/20'
+                      : 'bg-bg-pill text-fg-secondary hover:text-fg hover:bg-bg-pillHover border border-border'
+                    }`}
                 >
+                  <span className="text-xs">{cat.icon}</span>
                   <span>{cat.label}</span>
                 </button>
               );
@@ -372,18 +468,18 @@ export default function ExplorerHeader({
       {/* Location Modal */}
       {locationOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-start justify-center pt-24 px-4"
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-start justify-center pt-20 px-4"
           onClick={() => setLocationOpen(false)}
         >
           <div
-            className="w-full max-w-sm bg-[#17120E] border border-[#F6EAD7]/10 rounded-3xl p-5 shadow-2xl animate-scale-in"
+            className="w-full max-w-sm bg-bg-card border border-border rounded-3xl p-5 shadow-2xl animate-scale-in"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-serif text-base font-bold text-[#F6EAD7]">Select City Region</h3>
+              <h3 className="font-serif text-base font-bold text-fg-heading">Select City Region</h3>
               <button
                 onClick={() => setLocationOpen(false)}
-                className="text-[#9E8B75] hover:text-[#F6EAD7]"
+                className="text-fg-muted hover:text-fg cursor-pointer p-1"
               >
                 ✕
               </button>
@@ -402,15 +498,14 @@ export default function ExplorerHeader({
                     onCityChange(loc.name);
                     setLocationOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between p-3 rounded-2xl text-left transition-all ${
-                    selectedCity === loc.name
-                      ? 'bg-[#C8893F]/15 border border-[#C8893F]/40 text-[#E0AF62]'
-                      : 'hover:bg-[#211A14] text-[#F6EAD7]'
-                  }`}
+                  className={`w-full flex items-center justify-between p-3 rounded-2xl text-left transition-all cursor-pointer ${selectedCity === loc.name
+                      ? 'bg-[#C8893F]/15 border border-[#C8893F]/40 text-[#C8893F] font-bold'
+                      : 'hover:bg-bg-cardHover text-fg'
+                    }`}
                 >
                   <div>
                     <p className="text-xs font-bold">{loc.name}</p>
-                    <p className="text-[10px] text-[#9E8B75]">{loc.sub}</p>
+                    <p className="text-[10px] text-fg-muted">{loc.sub}</p>
                   </div>
                   {selectedCity === loc.name && <Sparkles className="w-3.5 h-3.5 text-[#C8893F]" />}
                 </button>
@@ -422,7 +517,7 @@ export default function ExplorerHeader({
                 onUseGps();
                 setLocationOpen(false);
               }}
-              className="w-full mt-3 py-2.5 rounded-xl bg-[#211A14] hover:bg-[#2A2119] border border-[#F6EAD7]/10 text-xs font-bold text-[#F6EAD7] flex items-center justify-center gap-2 transition-all cursor-pointer"
+              className="w-full mt-3 py-2.5 rounded-xl bg-bg-pill hover:bg-bg-pillHover border border-border text-xs font-bold text-fg flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <MapPin className="w-3.5 h-3.5 text-[#C8893F]" />
               Detect My GPS Location
@@ -437,7 +532,7 @@ export default function ExplorerHeader({
         onOpenChange={setShowCommandPalette}
         onSelectShop={(shopId) => {
           navTo('shop');
-          router.push(`/explorer/shop/${shopId}`);
+          router.push(`/shops/${shopId}`);
         }}
       />
       {showFilters && (
@@ -449,11 +544,8 @@ export default function ExplorerHeader({
         />
       )}
       <VisualSearchModal
-        open={showVisual || showLens}
-        onOpenChange={(open) => {
-          setShowVisual(open);
-          setShowLens(open);
-        }}
+        open={showVisual}
+        onOpenChange={setShowVisual}
       />
     </>
   );

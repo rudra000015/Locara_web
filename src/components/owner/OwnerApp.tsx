@@ -78,6 +78,15 @@ export default function OwnerApp({ routePage }: { routePage: OwnerPage }) {
   }, [setOwnerShopId, setOwnerShopName, setShopProducts, setShopProfile]);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        router.push('/auth?role=owner');
+      }
+    }
+  }, [router]);
+
+  useEffect(() => {
     void hydrateOwnerShop();
   }, [hydrateOwnerShop]);
 

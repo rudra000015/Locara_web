@@ -31,7 +31,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   userScalable: true,
-  themeColor: '#080808',
+  themeColor: '#09090B',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -60,7 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://api.dicebear.com" />
       </head>
-      <body suppressHydrationWarning className="bg-[#080808] text-[#F5F5F5] antialiased min-h-screen selection:bg-[#C9A96E]/20">
+      <body suppressHydrationWarning className="bg-bg text-fg antialiased min-h-screen">
         <ThemeSync />
         <LanguageSync />
         <NoiseOverlay />
