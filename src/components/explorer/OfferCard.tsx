@@ -30,7 +30,7 @@ export default function OfferCard({ offer }: Props) {
     <div
       onClick={() => {
         openShop(offer.shopId);
-        router.push(`/shop/${offer.shopId}`);
+        router.push(`/explorer/shop/${offer.shopId}`);
       }}
       className={`group shrink-0 w-64 sm:w-72 rounded-xl border p-4 flex flex-col justify-between transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md bg-white ${
         isFlash

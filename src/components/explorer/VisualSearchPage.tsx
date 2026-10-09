@@ -171,7 +171,7 @@ export default function VisualSearchPage() {
                 key={match.id}
                 onClick={() => {
                   openShop(match.shopId);
-                  router.push(`/shops/${match.shopId}`);
+                  router.push(`/explorer/shop/${match.shopId}`);
                 }}
                 className="p-4 sm:p-5 rounded-3xl bg-bg-card border border-border hover:border-[#C8893F] transition-all cursor-pointer shadow-md group flex items-center justify-between gap-4"
               >
