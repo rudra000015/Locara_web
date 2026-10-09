@@ -26,15 +26,6 @@
     "paths": {
       "@/*": [
         "./src/*"
-      ],
-      "@designcodeio/threeui": [
-        "./src/shaders/orb-gallery/OrbGallery.tsx"
-      ],
-      "@designcodeio/threeui/*": [
-        "./src/shaders/*"
-      ],
-      "@designcodeio/threeui/style.css": [
-        "./src/shaders/threeui.css"
       ]
     }
   },
