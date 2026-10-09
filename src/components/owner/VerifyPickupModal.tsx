@@ -1,190 +1,255 @@
 'use client';
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { X, QrCode, CheckCircle2, ShieldCheck, Sparkles, KeyRound } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import {
+  X,
+  QrCode,
+  CheckCircle2,
+  ShieldCheck,
+  KeyRound,
+  Check,
+  Camera,
+} from 'lucide-react';
 import { useStore } from '@/store/useStore';
-import PremiumButton from '@/components/ui/PremiumButton';
 
 interface Props {
-  isOpen: boolean;
+  reservation?: any | null;
   onClose: () => void;
-  reservationId?: string;
   onVerified?: () => void;
+  isOpen?: boolean;
 }
 
-export default function VerifyPickupModal({ isOpen, onClose, reservationId, onVerified }: Props) {
-  const { showToast } = useStore();
-  const [otp, setOtp] = useState('');
-  const [resIdInput, setResIdInput] = useState(reservationId || '');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [successData, setSuccessData] = useState<any | null>(null);
+export default function VerifyPickupModal({ onClose, onVerified }: Props) {
+  const { redeemReservationByOtp, showToast } = useStore();
+  const [activeTab, setActiveTab] = useState<'OTP' | 'QR'>('OTP');
+  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifiedData, setVerifiedData] = useState<any | null>(null);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  if (!isOpen) return null;
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  const handleVerify = async () => {
-    const targetId = resIdInput.trim() || reservationId;
-    if (!targetId && !otp.trim()) {
-      setError('Please provide the reservation ID or 6-digit OTP');
-      return;
-    }
+  const handleDigitChange = (index: number, val: string) => {
+    const cleanVal = val.replace(/\D/g, '').slice(-1);
+    const updated = [...otpDigits];
+    updated[index] = cleanVal;
+    setOtpDigits(updated);
 
-    setLoading(true);
-    setError('');
-
-    try {
-      const token = localStorage.getItem('auth_token') || '';
-      const res = await fetch(`/api/reservations/${targetId || 'direct'}/verify`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          otp: otp.trim(),
-          verificationMethod: 'OTP',
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Verification failed. Please check the code.');
-      }
-
-      setSuccessData(data.reservation);
-      showToast('Pickup verified! Footfall count updated.');
-      if (onVerified) onVerified();
-    } catch (err: any) {
-      setError(err?.message || 'Verification failed');
-    } finally {
-      setLoading(false);
+    // Auto advance focus
+    if (cleanVal && index < 5) {
+      inputRefs.current[index + 1]?.focus();
     }
   };
 
+  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    const fullOtp = otpDigits.join('').trim();
+    if (fullOtp.length < 6) {
+      setErrorMsg('Please enter all 6 digits of the pickup code.');
+      return;
+    }
+
+    setIsVerifying(true);
+    setErrorMsg('');
+
+    try {
+      const matching = useStore.getState().reservations.find((reservation) => reservation.otp === fullOtp || reservation.otp === `LOC-${fullOtp}`);
+      const token = localStorage.getItem('auth_token');
+      if (token && matching) {
+        const response = await fetch(`/api/reservations/${encodeURIComponent(matching.id)}/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ otp: fullOtp, verificationMethod: 'OTP' }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || 'Unable to verify this pickup');
+      }
+
+      const res = redeemReservationByOtp(fullOtp);
+      if (!res.success || !res.reservation) throw new Error(res.message);
+      setVerifiedData({
+        customer: res.reservation.customerName,
+        orderId: res.reservation.otp,
+        items: 1,
+        total: res.reservation.price,
+        paidOnline: res.reservation.advancePaid,
+        balance: res.reservation.balanceDue,
+      });
+    } catch (error: any) {
+      setErrorMsg(error?.message || 'Unable to verify this pickup');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleConfirmPickup = () => {
+    showToast('Pickup successfully completed & marked delivered!');
+    if (onVerified) onVerified();
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 15 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 15 }}
-        className="w-full max-w-md rounded-3xl bg-[#17120E] border border-[#F6EAD7]/15 p-6 sm:p-8 shadow-2xl relative my-8 text-center"
-      >
+    <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="w-full max-w-md bg-white rounded-2xl border border-[#E5E5E5] shadow-2xl p-6 relative">
+        {/* Close Button */}
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-5 right-5 text-[#9E8B75] hover:text-[#F6EAD7] p-1.5 rounded-full hover:bg-white/5 cursor-pointer"
+          className="absolute top-4 right-4 p-1.5 text-[#8A8A8A] hover:text-[#171717] rounded-lg hover:bg-[#F5F4F0]"
         >
           <X className="w-5 h-5" />
         </button>
 
-        {successData ? (
-          <div className="py-4">
-            <div className="w-16 h-16 rounded-3xl bg-[#1E5544]/30 border border-[#1E5544]/60 flex items-center justify-center text-[#2D7D64] mx-auto mb-4 shadow-glow-emerald">
-              <CheckCircle2 className="w-9 h-9 text-[#2D7D64]" />
-            </div>
+        {/* Modal Title */}
+        <div className="border-b border-[#E5E5E5] pb-3 mb-4">
+          <h2 className="font-bold text-lg text-[#171717]">Verify Pickup</h2>
+          <p className="text-xs text-[#666666]">
+            Enter customer OTP or scan QR pass to confirm pickup
+          </p>
+        </div>
 
-            <h3 className="font-serif text-2xl font-bold text-[#F6EAD7]">
-              Pickup Verified!
-            </h3>
-            <p className="text-xs text-[#9E8B75] mt-1 mb-6">
-              Customer store arrival recorded. Collect remaining in-store balance of{' '}
-              <strong className="text-[#E0AF62]">₹{successData.remainingAmount}</strong>.
-            </p>
-
-            <div className="p-4 rounded-2xl bg-[#211A14] border border-[#F6EAD7]/10 text-left text-xs space-y-1.5 mb-6">
-              <div className="flex justify-between">
-                <span className="text-[#9E8B75]">Reservation ID:</span>
-                <span className="font-mono font-bold text-[#F6EAD7]">{successData.reservationNumber}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#9E8B75]">Customer:</span>
-                <span className="font-bold text-[#F6EAD7]">{successData.userName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#9E8B75]">10% Advance Received:</span>
-                <span className="font-mono text-[#E0AF62]">₹{successData.advanceAmount}</span>
-              </div>
-            </div>
-
-            <PremiumButton variant="gold" size="md" onClick={onClose} className="w-full">
-              Done
-            </PremiumButton>
-          </div>
-        ) : (
-          <div>
-            <div className="w-12 h-12 rounded-2xl bg-[#211A14] border border-[#C8893F]/30 flex items-center justify-center text-[#E0AF62] mx-auto mb-3 shadow-glow-sm">
-              <QrCode className="w-6 h-6 text-[#C8893F]" />
-            </div>
-
-            <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#C8893F]">
-              SELLER VERIFICATION
-            </span>
-            <h3 className="font-serif text-2xl font-bold text-[#F6EAD7] mt-1 mb-2">
-              Verify Customer Pickup
-            </h3>
-            <p className="text-xs text-[#9E8B75] mb-6">
-              Enter the customer&apos;s 6-digit pickup OTP or Reservation ID to record the visit and confirm pickup.
-            </p>
-
-            <div className="space-y-4 text-left">
-              <div>
-                <label className="block text-[10px] font-mono uppercase font-bold text-[#9E8B75] mb-1">
-                  6-Digit Pickup OTP *
-                </label>
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                  placeholder="e.g. 492810"
-                  className="w-full px-4 py-3 rounded-xl bg-[#211A14] border border-[#F6EAD7]/10 text-center font-mono text-xl tracking-widest text-[#E0AF62] placeholder-[#6E5D4B] outline-none focus:border-[#C8893F]"
-                />
-              </div>
-
-              {!reservationId && (
-                <div>
-                  <label className="block text-[10px] font-mono uppercase font-bold text-[#9E8B75] mb-1">
-                    Reservation ID (Optional if OTP provided)
-                  </label>
-                  <input
-                    type="text"
-                    value={resIdInput}
-                    onChange={(e) => setResIdInput(e.target.value)}
-                    placeholder="e.g. LOC-8829-1029"
-                    className="w-full px-4 py-2.5 rounded-xl bg-[#211A14] border border-[#F6EAD7]/10 text-xs font-mono text-[#F6EAD7] placeholder-[#6E5D4B] outline-none focus:border-[#C8893F]"
-                  />
-                </div>
-              )}
-            </div>
-
-            {error && (
-              <p className="mt-4 p-3 rounded-xl bg-[#C24136]/15 border border-[#C24136]/30 text-xs text-[#C24136]">
-                {error}
-              </p>
-            )}
-
-            <div className="mt-6 flex gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-3 rounded-xl bg-[#211A14] text-xs font-bold text-[#9E8B75] border border-[#F6EAD7]/10"
-              >
-                Cancel
-              </button>
-              <PremiumButton
-                variant="gold"
-                size="md"
-                onClick={handleVerify}
-                disabled={loading || !otp}
-                className="flex-1"
-                magnetic
-              >
-                {loading ? 'Verifying...' : 'Verify Pickup'}
-              </PremiumButton>
-            </div>
+        {/* Tabs */}
+        {!verifiedData && (
+          <div className="flex border-b border-[#E5E5E5] mb-5">
+            <button
+              type="button"
+              onClick={() => setActiveTab('OTP')}
+              className={`flex-1 py-2 text-xs font-bold border-b-2 transition-colors ${
+                activeTab === 'OTP'
+                  ? 'border-[#A85420] text-[#A85420]'
+                  : 'border-transparent text-[#666666] hover:text-[#171717]'
+              }`}
+            >
+              Enter OTP
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('QR')}
+              className={`flex-1 py-2 text-xs font-bold border-b-2 transition-colors ${
+                activeTab === 'QR'
+                  ? 'border-[#A85420] text-[#A85420]'
+                  : 'border-transparent text-[#666666] hover:text-[#171717]'
+              }`}
+            >
+              Scan QR Code
+            </button>
           </div>
         )}
-      </motion.div>
+
+        {/* State 1: Verification Form */}
+        {!verifiedData ? (
+          <div className="space-y-5">
+            {activeTab === 'OTP' ? (
+              <div className="space-y-4 text-center">
+                <span className="text-xs font-semibold text-[#666666]">
+                  Enter 6-digit Pickup Code
+                </span>
+
+                {/* 6 Digit Input Boxes (Mockup Screen 8) */}
+                <div className="flex items-center justify-center gap-2">
+                  {otpDigits.map((digit, idx) => (
+                    <input
+                      key={idx}
+                      ref={(el) => {
+                        inputRefs.current[idx] = el;
+                      }}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => handleDigitChange(idx, e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(idx, e)}
+                      className="w-11 h-12 text-center text-lg font-mono font-bold bg-[#F5F4F0] border-2 border-[#E5E5E5] focus:border-[#A85420] focus:bg-white rounded-lg outline-none text-[#171717] transition-all"
+                    />
+                  ))}
+                </div>
+
+                {errorMsg && (
+                  <p className="text-xs text-[#DC2626] font-medium">{errorMsg}</p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleVerifyOtp}
+                  disabled={isVerifying}
+                  className="w-full py-2.5 px-4 bg-[#A85420] hover:bg-[#873F17] text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
+                >
+                  {isVerifying ? 'Verifying...' : 'Verify'}
+                </button>
+              </div>
+            ) : (
+              <div className="py-8 text-center space-y-3 bg-[#F5F4F0] rounded-xl border border-dashed border-[#E5E5E5]">
+                <Camera className="w-10 h-10 text-[#A85420] mx-auto" />
+                <p className="text-xs text-[#666666] max-w-xs mx-auto">
+                  Camera ready. Point camera at customer&apos;s digital QR pass.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleVerifyOtp}
+                  className="px-4 py-1.5 bg-white border border-[#E5E5E5] text-[#171717] text-xs font-semibold rounded-lg hover:bg-[#EAE8E2]"
+                >
+                  Simulate QR Scan
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* State 2: Verification Success Card (Mockup Screen 8) */
+          <div className="space-y-4 pt-1">
+            {/* Success Banner */}
+            <div className="flex items-center gap-2 bg-[#EBF8F0] text-[#16803C] p-3 rounded-lg border border-[#A7F3D0]">
+              <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+              <span className="text-sm font-bold">Pickup Verified</span>
+            </div>
+
+            {/* Customer & Order Summary */}
+            <div className="bg-[#FAFAF8] border border-[#E5E5E5] rounded-xl p-4 text-xs space-y-2">
+              <div className="flex justify-between">
+                <span className="text-[#666666]">Customer:</span>
+                <span className="font-bold text-[#171717]">{verifiedData.customer}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#666666]">Order ID:</span>
+                <span className="font-mono font-bold text-[#171717]">{verifiedData.orderId}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#666666]">Items:</span>
+                <span className="font-medium text-[#171717]">{verifiedData.items} items</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#666666]">Total:</span>
+                <span className="font-bold text-[#171717]">
+                  ₹{verifiedData.total.toLocaleString('en-IN')}
+                </span>
+              </div>
+              <div className="flex justify-between text-[#16803C] font-semibold">
+                <span>Paid Online:</span>
+                <span>₹{verifiedData.paidOnline.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between pt-2 border-t border-[#E5E5E5] text-[#171717] text-sm">
+                <span className="font-bold">Balance to Collect:</span>
+                <span className="font-black text-[#A85420]">
+                  ₹{verifiedData.balance.toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+
+            {/* Confirm Pickup Button */}
+            <button
+              type="button"
+              onClick={handleConfirmPickup}
+              className="w-full py-3 px-4 bg-[#A85420] hover:bg-[#873F17] text-white text-xs font-bold rounded-xl transition-colors shadow-sm"
+            >
+              Confirm Pickup
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

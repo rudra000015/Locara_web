@@ -1,8 +1,8 @@
 'use client';
 
+import React from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { Tag, Flame, Gift, ArrowRight, Store, Sparkles } from 'lucide-react';
+import { Flame, Gift, ArrowRight, Store } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 
 interface Props {
@@ -20,62 +20,59 @@ interface Props {
   index: number;
 }
 
-export default function OfferCard({ offer, index }: Props) {
+export default function OfferCard({ offer }: Props) {
   const router = useRouter();
   const { openShop } = useStore();
 
   const isFlash = Boolean(offer.flashSale);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.06, duration: 0.4 }}
+    <div
       onClick={() => {
         openShop(offer.shopId);
-        router.push(`/explorer/shop/${offer.shopId}`);
+        router.push(`/shop/${offer.shopId}`);
       }}
-      className={`group shrink-0 w-64 sm:w-72 rounded-3xl border p-5 flex flex-col justify-between transition-all duration-300 cursor-pointer shadow-md hover:shadow-xl ${
+      className={`group shrink-0 w-64 sm:w-72 rounded-xl border p-4 flex flex-col justify-between transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md bg-white ${
         isFlash
-          ? 'bg-gradient-to-br from-[#26160F] to-[#17120E] border-[#C8893F]/40 hover:border-[#C8893F]/80 hover:shadow-glow'
-          : 'bg-[#1B140F] border-[#F6EAD7]/10 hover:border-[#1E5544]/60'
+          ? 'border-[#A85420]/40 hover:border-[#A85420]'
+          : 'border-[#E5E5E5] hover:border-[#A85420]/40'
       }`}
     >
       <div>
         {/* Top Badges */}
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-2">
           <span
-            className={`px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold flex items-center gap-1 ${
+            className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${
               isFlash
-                ? 'bg-[#C8893F]/20 text-[#E0AF62] border border-[#C8893F]/40'
-                : 'bg-[#1E5544]/20 text-[#2D7D64] border border-[#1E5544]/40'
+                ? 'bg-[#A85420]/10 text-[#A85420]'
+                : 'bg-[#16803C]/10 text-[#16803C]'
             }`}
           >
-            {isFlash ? <Flame className="w-3 h-3 text-[#E0AF62]" /> : <Gift className="w-3 h-3 text-[#2D7D64]" />}
+            {isFlash ? <Flame className="w-3 h-3 text-[#A85420]" /> : <Gift className="w-3 h-3 text-[#16803C]" />}
             {offer.badgeText}
           </span>
         </div>
 
-        <p className="text-[10px] font-mono uppercase tracking-wider text-[#9E8B75] flex items-center gap-1">
-          <Store className="w-3 h-3 text-[#C8893F]" />
+        <p className="text-[11px] font-semibold text-[#666666] flex items-center gap-1">
+          <Store className="w-3 h-3 text-[#A85420]" />
           {offer.shopName}
         </p>
 
-        <h3 className="font-serif text-lg font-bold text-[#F6EAD7] group-hover:text-[#E0AF62] transition-colors leading-tight mt-1">
+        <h3 className="text-sm font-bold text-[#171717] group-hover:text-[#A85420] transition-colors leading-tight mt-1">
           {offer.title}
         </h3>
 
-        <p className="text-[11px] text-[#9E8B75] line-clamp-2 mt-2 leading-relaxed">
+        <p className="text-xs text-[#666666] line-clamp-2 mt-1.5 leading-relaxed">
           {offer.description}
         </p>
       </div>
 
-      <div className="mt-5 pt-3 border-t border-[#F6EAD7]/10 flex items-center justify-between">
-        <span className="text-xs font-bold text-[#E0AF62] flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-          Claim in Store <ArrowRight className="w-3.5 h-3.5" />
+      <div className="mt-4 pt-2.5 border-t border-[#E5E5E5] flex items-center justify-between">
+        <span className="text-xs font-bold text-[#A85420] flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+          Claim at Shop <ArrowRight className="w-3.5 h-3.5" />
         </span>
-        <span className="text-[10px] font-mono text-[#D8C4A7] font-bold">10% ADVANCE</span>
+        <span className="text-[10px] font-bold text-[#666666]">10% Deposit</span>
       </div>
-    </motion.div>
+    </div>
   );
 }

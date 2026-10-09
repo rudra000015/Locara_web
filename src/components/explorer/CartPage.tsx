@@ -1,206 +1,211 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { ShoppingBag, Store, Trash2, Plus, Minus, ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
-import { useStore, CartItem } from '@/store/useStore';
-import PremiumButton from '@/components/ui/PremiumButton';
-import ReservationConfirmationModal from './ReservationConfirmationModal';
+import { useStore } from '@/store/useStore';
+import {
+  ShoppingBag,
+  Store,
+  Trash2,
+  Plus,
+  Minus,
+  ArrowRight,
+  ShieldCheck,
+  CheckCircle2,
+  Lock,
+  ChevronRight,
+} from 'lucide-react';
 
 export default function CartPage() {
   const router = useRouter();
-  const { cart, getCartByShop, removeFromCart, updateCartQuantity, clearShopCart, navTo, showToast, user } = useStore();
-  const [submittingShopId, setSubmittingShopId] = useState<string | null>(null);
-  const [completedReservation, setCompletedReservation] = useState<any | null>(null);
+  const {
+    cart,
+    getCartByShop,
+    removeFromCart,
+    updateCartQuantity,
+    clearCart,
+    clearShopCart,
+    createReservation,
+    navTo,
+    showToast,
+    user,
+  } = useStore();
+
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const grouped = getCartByShop();
   const shopIds = Object.keys(grouped);
 
-  const handleReserveShop = async (shopId: string) => {
-    const shopGroup = grouped[shopId];
-    if (!shopGroup || shopGroup.items.length === 0) return;
+  // Overall totals across all shops
+  let grandTotal = 0;
+  let grandReserveOnline = 0;
+  let grandPayAtShop = 0;
 
-    setSubmittingShopId(shopId);
-    showToast(`Initializing Razorpay checkout for ${shopGroup.shopName}...`);
+  shopIds.forEach((sId) => {
+    grandTotal += grouped[sId].total;
+    grandReserveOnline += grouped[sId].advance;
+    grandPayAtShop += grouped[sId].balance;
+  });
 
-    try {
-      const totalShopPrice = shopGroup.items.reduce(
-        (sum, item) => sum + item.price * (item.quantity || 1),
-        0
-      );
-      const advanceDeposit = Math.max(1, Math.round(totalShopPrice * 0.1));
+  const handleCheckoutAll = () => {
+    if (cart.length === 0) return;
+    setIsProcessing(true);
 
-      const { openRazorpayCheckout } = await import('@/lib/payments/razorpayClient');
-
-      await openRazorpayCheckout({
-        amount: advanceDeposit,
-        shopId,
-        shopName: shopGroup.shopName,
-        customerName: user?.name || 'Locara Explorer',
-        customerEmail: user?.email || 'explorer@locara.app',
-        description: `10% In-Store Reservation Deposit at ${shopGroup.shopName}`,
-        onSuccess: async (paymentResult) => {
-          showToast('Payment verified! Finalizing in-store reservation...');
-          const token = localStorage.getItem('auth_token') || '';
-
-          const res = await fetch('/api/reservations', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            body: JSON.stringify({
-              shopId,
-              shopName: shopGroup.shopName,
-              shopAddress: shopGroup.shopAddress,
-              items: shopGroup.items,
-              customerName: user?.name || 'Explorer',
-              customerEmail: user?.email || '',
-              paymentMethod: paymentResult.paymentMethod || 'RAZORPAY',
-              paymentTransactionId: paymentResult.paymentId,
-            }),
-          });
-
-          const data = await res.json();
-          if (!res.ok || !data.reservation) {
-            throw new Error(data.error || 'Failed to place reservation');
-          }
-
-          clearShopCart(shopId);
-          setCompletedReservation(data.reservation);
-          showToast('Reservation placed! 10% advance deposit processed.');
-          setSubmittingShopId(null);
-        },
-        onDismiss: () => {
-          setSubmittingShopId(null);
-        },
-        onError: (err: any) => {
-          showToast(err?.description || err?.message || 'Payment cancelled');
-          setSubmittingShopId(null);
-        },
+    // Create reservation passes for each shop in the cart
+    shopIds.forEach((sId) => {
+      const g = grouped[sId];
+      g.items.forEach((item) => {
+        createReservation({
+          productId: item.productId,
+          productName: item.name,
+          productImage: item.image || '',
+          price: item.price * item.quantity,
+          shopId: item.shopId,
+          shopName: item.shopName,
+          shopAddress: item.shopAddress || 'Meerut, Uttar Pradesh',
+          customerName: user?.name || 'Rahul Sharma',
+          customerPhone: user?.phone || '+91 98370 55555',
+        });
       });
-    } catch (err: any) {
-      showToast(err?.message || 'Unable to place reservation');
-      setSubmittingShopId(null);
-    }
+      clearShopCart(sId);
+    });
+
+    setTimeout(() => {
+      setIsProcessing(false);
+      showToast('Reservation confirmed! View your Pickup Passes.');
+      navTo('reservations');
+      router.push('/explorer/reservations');
+    }, 600);
   };
 
-  return (
-    <div className="max-w-4xl mx-auto pb-32">
-      {/* Header */}
-      <div className="p-4 sm:p-8 rounded-3xl bg-[#17120E] border border-[#F6EAD7]/10 mb-6 shadow-xl">
-        <div className="flex items-center gap-2 mb-1.5">
-          <ShoppingBag className="w-4 h-4 text-[#C8893F]" />
-          <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#C8893F]">
-            IN-STORE PICKUP CART
-          </span>
+  if (cart.length === 0) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+        <div className="bg-white border border-[#E5E5E5] rounded-2xl p-12 max-w-md mx-auto space-y-4 shadow-sm">
+          <div className="w-16 h-16 rounded-full bg-[#F5F4F0] text-[#8A8A8A] flex items-center justify-center mx-auto">
+            <ShoppingBag className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-bold text-[#171717]">Your Cart is Empty</h2>
+          <p className="text-xs text-[#666666] max-w-xs mx-auto">
+            Discover unique local shops and reserve artisanal products with just a 10% deposit.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              navTo('home');
+              router.push('/');
+            }}
+            className="px-6 py-2.5 bg-[#A85420] hover:bg-[#873F17] text-white text-xs font-bold rounded-lg transition-colors inline-flex items-center gap-1.5"
+          >
+            <span>Explore Marketplace</span>
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
-        <h1 className="font-serif text-xl sm:text-3xl font-bold text-[#F6EAD7]">
-          Your Shopping Cart
-        </h1>
-        <p className="text-xs text-[#9E8B75] mt-1">
-          Items are grouped by physical shop. You can reserve items with a 10% advance per shop.
-        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20">
+      {/* ── 1. Header ──────────────────────────────────────── */}
+      <div className="flex items-center justify-between border-b border-[#E5E5E5] pb-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-extrabold text-[#171717]">Your Cart</h1>
+          <p className="text-xs text-[#666666] mt-0.5">
+            {shopIds.length} {shopIds.length === 1 ? 'Shop' : 'Shops'} • {cart.reduce((s, i) => s + i.quantity, 0)} Items
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={clearCart}
+          className="text-xs font-semibold text-[#DC2626] hover:underline"
+        >
+          Clear Cart
+        </button>
       </div>
 
-      {cart.length === 0 ? (
-        <div className="p-16 rounded-3xl bg-[#17120E] border border-[#F6EAD7]/10 text-center max-w-md mx-auto my-8">
-          <div className="w-14 h-14 rounded-2xl bg-[#211A14] border border-[#F6EAD7]/10 flex items-center justify-center text-2xl mx-auto mb-3">
-            🛒
-          </div>
-          <h3 className="font-serif text-lg font-bold text-[#F6EAD7]">Your Cart is Empty</h3>
-          <p className="text-xs text-[#9E8B75] mt-1 mb-6">
-            Explore local shops and add authentic products to reserve for physical pickup.
-          </p>
-          <PremiumButton variant="gold" size="md" onClick={() => navTo('home')} magnetic>
-            Explore Local Stores
-          </PremiumButton>
-        </div>
-      ) : (
-        <div className="space-y-8">
+      {/* ── 2. Main Cart Layout ────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left 2 Columns: Items Grouped by Shop */}
+        <div className="lg:col-span-2 space-y-6">
           {shopIds.map((shopId) => {
             const group = grouped[shopId];
-            const isSubmitting = submittingShopId === shopId;
-
             return (
               <div
                 key={shopId}
-                className="rounded-3xl bg-[#17120E] border border-[#F6EAD7]/10 overflow-hidden shadow-lg"
+                className="bg-white border border-[#E5E5E5] rounded-xl overflow-hidden shadow-sm"
               >
                 {/* Shop Group Header */}
-                <div className="p-5 bg-[#211A14] border-b border-[#F6EAD7]/10 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-[#261D16] flex items-center justify-center text-[#C8893F]">
-                      <Store className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h3 className="font-serif font-bold text-base text-[#F6EAD7]">{group.shopName}</h3>
-                      {group.shopAddress && (
-                        <p className="text-[11px] text-[#9E8B75]">{group.shopAddress}</p>
-                      )}
-                    </div>
+                <div className="bg-[#F5F4F0] px-5 py-3 border-b border-[#E5E5E5] flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Store className="w-4 h-4 text-[#A85420]" />
+                    <span className="font-bold text-sm text-[#171717]">{group.shopName}</span>
                   </div>
-
-                  <span className="text-[10px] font-mono font-bold text-[#E0AF62] uppercase tracking-wider bg-[#17120E] px-3 py-1 rounded-full border border-[#C8893F]/20">
-                    Physical Pickup Store
-                  </span>
+                  <span className="text-xs text-[#666666]">In-Store Pickup</span>
                 </div>
 
                 {/* Items List */}
-                <div className="p-5 divide-y divide-[#F6EAD7]/5">
+                <div className="divide-y divide-[#E5E5E5] px-5">
                   {group.items.map((item) => (
-                    <div key={item.id} className="py-4 first:pt-0 last:pb-0 flex items-center gap-4">
-                      {item.image ? (
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="w-16 h-16 rounded-2xl object-cover bg-[#211A14] border border-[#F6EAD7]/10 shrink-0"
-                        />
-                      ) : (
-                        <div className="w-16 h-16 rounded-2xl bg-[#261D16] flex items-center justify-center text-xl shrink-0">
-                          🏛️
-                        </div>
-                      )}
+                    <div key={item.id} className="py-4 flex items-center gap-4">
+                      {/* Thumbnail */}
+                      <div className="w-16 h-16 rounded-lg bg-[#F5F4F0] overflow-hidden shrink-0 border border-[#E5E5E5]">
+                        {item.image ? (
+                          <img
+                            src={item.image}
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-400">
+                            <ShoppingBag className="w-6 h-6" />
+                          </div>
+                        )}
+                      </div>
 
-                      <div className="min-w-0 flex-1">
-                        <h4 className="font-serif font-bold text-sm text-[#F6EAD7] truncate">{item.name}</h4>
-                        <div className="flex items-center gap-2 mt-0.5 text-xs text-[#9E8B75]">
-                          {item.size && <span>Size: {item.size}</span>}
-                          {item.color && <span>• Color: {item.color}</span>}
-                        </div>
-                        <p className="font-mono text-xs font-bold text-[#E0AF62] mt-1">
-                          ₹{item.price.toLocaleString('en-IN')}{' '}
-                          <span className="text-[10px] text-[#9E8B75] font-normal">/ {item.unit || 'unit'}</span>
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-sm text-[#171717] truncate">
+                          {item.name}
+                        </h4>
+                        <p className="text-xs font-bold text-[#171717] mt-0.5">
+                          ₹{item.price.toLocaleString('en-IN')}
                         </p>
                       </div>
 
-                      {/* Quantity Controls */}
-                      <div className="flex items-center gap-2 bg-[#211A14] p-1 rounded-xl border border-[#F6EAD7]/10">
+                      {/* Quantity Selector */}
+                      <div className="flex items-center border border-[#E5E5E5] rounded-lg bg-[#FAFAF8]">
                         <button
                           type="button"
                           onClick={() => updateCartQuantity(item.id, item.quantity - 1)}
-                          className="w-7 h-7 rounded-lg hover:bg-white/5 flex items-center justify-center text-[#9E8B75] hover:text-[#F6EAD7]"
+                          className="p-1.5 text-[#666666] hover:text-[#171717]"
                         >
                           <Minus className="w-3.5 h-3.5" />
                         </button>
-                        <span className="font-mono text-xs font-bold w-5 text-center text-[#F6EAD7]">
-                          {item.quantity}
-                        </span>
+                        <span className="px-3 text-xs font-bold text-[#171717]">{item.quantity}</span>
                         <button
                           type="button"
                           onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
-                          className="w-7 h-7 rounded-lg hover:bg-white/5 flex items-center justify-center text-[#9E8B75] hover:text-[#F6EAD7]"
+                          className="p-1.5 text-[#666666] hover:text-[#171717]"
                         >
                           <Plus className="w-3.5 h-3.5" />
                         </button>
                       </div>
 
-                      {/* Remove */}
+                      {/* Item Total */}
+                      <div className="text-right min-w-[70px]">
+                        <span className="font-bold text-sm text-[#171717]">
+                          ₹{(item.price * item.quantity).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+
+                      {/* Delete */}
                       <button
                         type="button"
                         onClick={() => removeFromCart(item.id)}
-                        className="p-2 text-[#6E5D4B] hover:text-[#C24136] transition-colors"
+                        className="p-1.5 text-[#8A8A8A] hover:text-[#DC2626] transition-colors"
+                        title="Remove item"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -208,44 +213,74 @@ export default function CartPage() {
                   ))}
                 </div>
 
-                {/* Shop Group Checkout Footer */}
-                <div className="p-5 bg-[#140F0B] border-t border-[#F6EAD7]/10 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="text-left w-full sm:w-auto">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-xs text-[#9E8B75]">Total:</span>
-                      <span className="font-mono text-sm font-bold text-[#F6EAD7]">₹{group.total.toLocaleString('en-IN')}</span>
-                      <span className="text-xs text-[#E0AF62] font-bold">✦ Pay 10% Advance: ₹{group.advance.toLocaleString('en-IN')}</span>
-                    </div>
-                    <p className="text-[11px] text-[#9E8B75] mt-0.5">
-                      Pay remaining ₹{group.balance.toLocaleString('en-IN')} at {group.shopName} upon pickup.
-                    </p>
+                {/* Per-Shop Subtotal Box */}
+                <div className="bg-[#FAFAF8] px-5 py-3 border-t border-[#E5E5E5] text-xs space-y-1">
+                  <div className="flex justify-between text-[#666666]">
+                    <span>Subtotal ({group.items.reduce((s, i) => s + i.quantity, 0)} items):</span>
+                    <span className="font-bold text-[#171717]">₹{group.total.toLocaleString('en-IN')}</span>
                   </div>
-
-                  <PremiumButton
-                    variant="gold"
-                    size="md"
-                    onClick={() => handleReserveShop(shopId)}
-                    disabled={isSubmitting}
-                    className="w-full sm:w-auto"
-                    magnetic
-                  >
-                    {isSubmitting ? 'Securing...' : `Reserve for ₹${group.advance}`}
-                  </PremiumButton>
+                  <div className="flex justify-between text-[#16803C] font-semibold">
+                    <span>Reserve Deposit (10%):</span>
+                    <span>₹{group.advance.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between text-[#666666]">
+                    <span>Pay at Shop (90%):</span>
+                    <span className="font-semibold text-[#171717]">₹{group.balance.toLocaleString('en-IN')}</span>
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
-      )}
 
-      {/* Reservation Confirmation Modal */}
-      {completedReservation && (
-        <ReservationConfirmationModal
-          isOpen={Boolean(completedReservation)}
-          onClose={() => setCompletedReservation(null)}
-          reservation={completedReservation}
-        />
-      )}
+        {/* Right 1 Column: Order Summary & Checkout */}
+        <div className="space-y-4">
+          <div className="bg-white border border-[#E5E5E5] rounded-xl p-5 space-y-4 shadow-sm sticky top-24">
+            <h3 className="font-bold text-base text-[#171717] border-b border-[#E5E5E5] pb-3">
+              Order Summary
+            </h3>
+
+            <div className="space-y-2.5 text-xs">
+              <div className="flex justify-between text-[#666666]">
+                <span>Total Item Value:</span>
+                <span className="font-bold text-[#171717]">₹{grandTotal.toLocaleString('en-IN')}</span>
+              </div>
+
+              <div className="flex justify-between text-[#16803C] font-semibold bg-[#EBF8F0] p-2.5 rounded-lg border border-[#A7F3D0]">
+                <span>Total Reserve Deposit (Pay Online 10%):</span>
+                <span className="font-bold">₹{grandReserveOnline.toLocaleString('en-IN')}</span>
+              </div>
+
+              <div className="flex justify-between text-[#171717] font-semibold pt-1">
+                <span className="text-[#666666]">Total Pay at Shop (90%):</span>
+                <span>₹{grandPayAtShop.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+
+            {/* In-Store Pickup Details Note */}
+            <div className="bg-[#F5F4F0] p-3 rounded-lg text-[11px] text-[#666666] space-y-1">
+              <p className="font-bold text-[#171717] flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#16803C]" />
+                <span>100% Verified Pickup Guarantee</span>
+              </p>
+              <p>
+                Pay 10% now to reserve. Inspect and collect your items in-store, and pay the remaining 90% balance directly at the counter.
+              </p>
+            </div>
+
+            {/* Continue to Payment Button */}
+            <button
+              type="button"
+              onClick={handleCheckoutAll}
+              disabled={isProcessing}
+              className="w-full py-3 px-4 bg-[#A85420] hover:bg-[#873F17] text-white font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm"
+            >
+              <Lock className="w-4 h-4" />
+              <span>{isProcessing ? 'Confirming...' : 'Continue to Payment'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

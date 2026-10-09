@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDb } from "@/lib/mongodb";
 import { Visit } from "@/models/Visit";
+import { ShopProfile } from "@/models/ShopProfile";
 import { extractBearerToken, verifyAuthToken } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
@@ -9,14 +10,13 @@ export async function GET(req: NextRequest) {
     if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const auth = verifyAuthToken(token);
-    const { searchParams } = new URL(req.url);
-    const shopId = searchParams.get("shopId");
-
     await connectDb();
 
     const query: Record<string, any> = {};
-    if (auth.role === "owner" && shopId) {
-      query.shopId = shopId;
+    if (auth.role === "owner") {
+      const ownerShop = await ShopProfile.findOne({ ownerId: auth.id }).lean();
+      if (!ownerShop) return NextResponse.json({ visits: [], total: 0 });
+      query.shopId = ownerShop.shopId;
     } else {
       query.userId = auth.id;
     }

@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Review } from '@/types/review';
 import { useStore } from '@/store/useStore';
-import { Star, ThumbsUp, MessageSquare, CheckCircle2 } from 'lucide-react';
+import { Star, ThumbsUp, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   review: Review;
+  shopId?: string;
   onVoteHelpful?: (id: string) => void;
-  onHelpful?: (id: string) => void;
+  onHelpfulToggle?: (id: string) => void;
   isOwner?: boolean;
   onReply?: (id: string, text: string) => Promise<void>;
 }
@@ -16,7 +17,7 @@ interface Props {
 export default function ReviewCard({
   review: r,
   onVoteHelpful,
-  onHelpful,
+  onHelpfulToggle,
   isOwner,
   onReply,
 }: Props) {
@@ -29,13 +30,14 @@ export default function ReviewCard({
   const [replyText, setReplyText] = useState(r.ownerReply?.text ?? '');
   const [saving, setSaving] = useState(false);
 
-  const BODY_LIMIT = 160;
-  const isLong = r.body.length > BODY_LIMIT;
+  const BODY_LIMIT = 150;
+  const isLong = r.body && r.body.length > BODY_LIMIT;
   const displayBody = isLong && !expanded ? r.body.slice(0, BODY_LIMIT) + '...' : r.body;
 
   const handleVote = () => {
-    if (onVoteHelpful) onVoteHelpful(r.id);
-    if (onHelpful) onHelpful(r.id);
+    const revId = r.id;
+    if (onHelpfulToggle) onHelpfulToggle(revId);
+    else if (onVoteHelpful) onVoteHelpful(revId);
   };
 
   const handleSaveReply = async () => {
@@ -47,43 +49,49 @@ export default function ReviewCard({
   };
 
   return (
-    <div className="p-5 rounded-2xl bg-[#121212] border border-white/[0.08] shadow-sm hover:border-white/[0.14] transition-all">
+    <div className="p-4 rounded-xl bg-white border border-[#E5E5E5] space-y-3">
       {/* User Header */}
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-[#1C1C1C] border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-[#F5F4F0] border border-[#E5E5E5] overflow-hidden flex items-center justify-center shrink-0">
             {r.userImg ? (
               <img src={r.userImg} alt={r.userName} className="w-full h-full object-cover" />
             ) : (
-              <span className="text-xs font-bold text-[#C9A96E]">
-                {r.userName.charAt(0).toUpperCase()}
+              <span className="text-xs font-bold text-[#A85420]">
+                {r.userName ? r.userName.charAt(0).toUpperCase() : 'U'}
               </span>
             )}
           </div>
 
           <div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-sm text-[#F5F5F5]">{r.userName}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-xs text-[#171717]">{r.userName}</span>
+              {r.verified && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#16803C]/10 text-[#16803C]">
+                  <CheckCircle2 className="w-2.5 h-2.5" />
+                  Verified Buyer
+                </span>
+              )}
               {isMine && (
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#C9A96E]/15 text-[#C9A96E] border border-[#C9A96E]/25">
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#A85420]/10 text-[#A85420]">
                   You
                 </span>
               )}
             </div>
 
             <div className="flex items-center gap-2 mt-0.5">
-              <div className="flex text-[#C9A96E]">
+              <div className="flex items-center text-[#D97706]">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <Star
                     key={i}
                     className={`w-3 h-3 ${
-                      i < r.rating ? 'fill-[#C9A96E] text-[#C9A96E]' : 'text-white/20'
+                      i < r.rating ? 'fill-[#D97706] text-[#D97706]' : 'text-[#E5E5E5]'
                     }`}
                   />
                 ))}
               </div>
-              <span className="text-[10px] font-mono text-[#71717A]">
-                {new Date(r.createdAt).toLocaleDateString(undefined, {
+              <span className="text-[10px] text-[#8A8A8A]">
+                {new Date(r.createdAt || Date.now()).toLocaleDateString('en-IN', {
                   month: 'short',
                   day: 'numeric',
                   year: 'numeric',
@@ -94,13 +102,16 @@ export default function ReviewCard({
         </div>
       </div>
 
-      {/* Review Body */}
-      <p className="text-xs sm:text-sm text-[#A1A1AA] leading-relaxed mb-3">
+      {/* Review Title & Body */}
+      {r.title && (
+        <h5 className="font-bold text-xs text-[#171717]">{r.title}</h5>
+      )}
+      <p className="text-xs text-[#666666] leading-relaxed">
         {displayBody}
         {isLong && (
           <button
             onClick={() => setExpanded(!expanded)}
-            className="text-[#C9A96E] font-bold ml-1.5 hover:underline"
+            className="text-[#A85420] font-bold ml-1 hover:underline cursor-pointer"
           >
             {expanded ? 'Show less' : 'Read more'}
           </button>
@@ -109,11 +120,11 @@ export default function ReviewCard({
 
       {/* Tags */}
       {r.tags && r.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-3">
+        <div className="flex flex-wrap gap-1.5">
           {r.tags.map((tag, idx) => (
             <span
               key={idx}
-              className="px-2.5 py-0.5 rounded-md bg-white/5 text-[10px] text-[#71717A] border border-white/5"
+              className="px-2 py-0.5 rounded bg-[#F5F4F0] text-[10px] font-medium text-[#666666] border border-[#E5E5E5]"
             >
               ✓ {tag}
             </span>
@@ -121,32 +132,60 @@ export default function ReviewCard({
         </div>
       )}
 
-      {/* Helpful Action */}
-      <div className="flex items-center justify-between pt-3 border-t border-white/5">
+      {/* Helpful Action & Owner Reply */}
+      <div className="flex items-center justify-between pt-2 border-t border-[#E5E5E5]">
         <button
           type="button"
           onClick={handleVote}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#181818] hover:bg-[#202020] border border-white/10 text-xs font-bold text-[#A1A1AA] hover:text-[#F5F5F5] transition-all cursor-pointer"
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#FAFAF8] hover:bg-[#F5F4F0] border border-[#E5E5E5] text-[11px] font-medium text-[#666666] hover:text-[#171717] transition-colors"
         >
-          <ThumbsUp className="w-3.5 h-3.5 text-[#C9A96E]" />
+          <ThumbsUp className="w-3 h-3 text-[#A85420]" />
           <span>Helpful {r.helpful ? `(${r.helpful})` : ''}</span>
         </button>
 
         {isOwner && !r.ownerReply && (
           <button
             onClick={() => setShowReplyBox(!showReplyBox)}
-            className="text-xs font-bold text-[#C9A96E] hover:underline"
+            className="text-xs font-bold text-[#A85420] hover:underline cursor-pointer"
           >
             Reply to customer
           </button>
         )}
       </div>
 
-      {/* Owner Reply */}
+      {/* Owner Reply Box */}
+      {showReplyBox && (
+        <div className="space-y-2 pt-2">
+          <textarea
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            placeholder="Write a response as the shop owner..."
+            className="w-full p-2 text-xs rounded border border-[#E5E5E5] text-[#171717]"
+            rows={2}
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setShowReplyBox(false)}
+              className="px-2.5 py-1 text-xs text-[#666666] hover:text-[#171717]"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveReply}
+              disabled={saving}
+              className="px-3 py-1 text-xs font-bold text-white bg-[#A85420] rounded"
+            >
+              {saving ? 'Posting...' : 'Post Reply'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Existing Owner Reply */}
       {r.ownerReply && (
-        <div className="mt-3 p-3.5 rounded-xl bg-[#181818] border-l-2 border-[#C9A96E] text-xs">
-          <p className="font-bold text-[#C9A96E] mb-1">Response from Store Owner</p>
-          <p className="text-[#A1A1AA]">{r.ownerReply.text}</p>
+        <div className="p-3 rounded-lg bg-[#F5F4F0] border-l-2 border-[#A85420] text-xs space-y-1">
+          <p className="font-bold text-[#A85420] text-[11px]">Response from Store Owner</p>
+          <p className="text-[#666666]">{r.ownerReply.text}</p>
         </div>
       )}
     </div>

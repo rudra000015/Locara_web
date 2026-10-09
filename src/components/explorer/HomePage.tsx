@@ -1,29 +1,51 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import {
-  Sparkles,
+  Search,
   MapPin,
-  Clock,
-  QrCode,
-  Tag,
+  Sparkles,
+  ShoppingBag,
   Store,
-  Compass,
+  ChevronRight,
   ArrowRight,
   ShieldCheck,
   CheckCircle2,
-  Calendar,
-  X,
-  BookOpen,
-  Coffee,
-  Heart,
-  Filter,
+  Clock,
+  Shirt,
+  Gem,
+  Lamp,
+  Palette,
+  Utensils,
+  Smile,
+  Smartphone,
+  MoreHorizontal,
+  Flame,
+  LocateFixed,
+  Map as MapIcon,
+  Navigation,
 } from 'lucide-react';
+import { getGoogleDirectionsUrl } from '@/lib/geo';
+
+const LeafletShopMap = dynamic(() => import('@/components/map/LeafletShopMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full min-h-[340px] rounded-2xl bg-[#242424] flex items-center justify-center text-gray-400 text-xs border border-white/10">
+      <div className="flex flex-col items-center gap-2">
+        <div className="w-6 h-6 border-2 border-[#A85420] border-t-transparent rounded-full animate-spin" />
+        <span className="text-gray-300 font-medium">Loading live discovery map...</span>
+      </div>
+    </div>
+  ),
+});
 import { useStore } from '@/store/useStore';
 import { Shop } from '@/types/shop';
 import { FilterState } from '@/data/categories';
-import ReservationDepositModal from './ReservationDepositModal';
+import { SHOPS } from '@/data/shops';
+import ShopCard from './ShopCard';
+import ProductCard from './ProductCard';
 
 interface Props {
   query: string;
@@ -32,640 +54,524 @@ interface Props {
   loading: boolean;
   error: string | null;
   refetch: (q?: string) => void;
-  onListShop: () => void;
+  onListShop?: () => void;
 }
 
-const DROPS = [
-  {
-    id: 'maya-drop-1',
-    name: 'Mulberry Katan Silk Saree',
-    atelier: 'Maya Studio & Atelier',
-    neighborhood: 'Indiranagar 100ft',
-    price: 18500,
-    distance: '0.4 km',
-    stock: 3,
-    address: '428, 100ft Road, Indiranagar, Bangalore',
-    image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=800&auto=format&fit=crop',
-    tag: 'Silk Mark Certified',
-  },
-  {
-    id: 'bombay-drop-1',
-    name: 'Hand-Cut Kundan Choker',
-    atelier: 'The Bombay Attic',
-    neighborhood: 'Lavelle Road',
-    price: 34000,
-    distance: '1.8 km',
-    stock: 1,
-    address: '9/2, Walton Road, Off Lavelle Road, Bangalore',
-    image: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?q=80&w=800&auto=format&fit=crop',
-    tag: 'Karigar Masterpiece',
-  },
-  {
-    id: 'clay-drop-1',
-    name: 'Wood-Fired Terracotta Urn',
-    atelier: 'Clay Station Studio',
-    neighborhood: 'Sadashivanagar',
-    price: 4200,
-    distance: '2.5 km',
-    stock: 4,
-    address: '1st Cross, Sadashivanagar, Bangalore',
-    image: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?q=80&w=800&auto=format&fit=crop',
-    tag: 'Studio Stamped',
-  },
-  {
-    id: 'vintage-drop-1',
-    name: 'Colonial Brass Magnifier',
-    atelier: 'Balaji Antiques',
-    neighborhood: 'Commercial Street',
-    price: 6800,
-    distance: '2.1 km',
-    stock: 2,
-    address: '64, Commercial Street, Bangalore',
-    image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=800&auto=format&fit=crop',
-    tag: 'Heritage Reproduction',
-  },
+const CATEGORIES = [
+  { id: 'fashion', label: 'Fashion', icon: Shirt, color: 'bg-rose-50 text-rose-600' },
+  { id: 'jewellery', label: 'Jewellery', icon: Gem, color: 'bg-amber-50 text-amber-600' },
+  { id: 'home-decor', label: 'Home Decor', icon: Lamp, color: 'bg-blue-50 text-blue-600' },
+  { id: 'handicrafts', label: 'Handicrafts', icon: Palette, color: 'bg-orange-50 text-orange-600' },
+  { id: 'food', label: 'Food', icon: Utensils, color: 'bg-emerald-50 text-emerald-600' },
+  { id: 'beauty', label: 'Beauty', icon: Smile, color: 'bg-pink-50 text-pink-600' },
+  { id: 'electronics', label: 'Electronics', icon: Smartphone, color: 'bg-purple-50 text-purple-600' },
+  { id: 'more', label: 'More', icon: MoreHorizontal, color: 'bg-gray-100 text-gray-700' },
 ];
 
-const BAZAARS = [
-  {
-    slug: 'indiranagar-100ft',
-    name: 'Indiranagar 100ft Cultural Mile',
-    tagline: 'Artisanal ateliers, indie roasters & design studios',
-    curatorNote: 'Best walked at 4:30 PM for golden hour courtyard access',
-    shopCount: 24,
-    image: 'https://images.unsplash.com/photo-1596178065887-1198b6148b2b?q=80&w=800&auto=format&fit=crop',
-  },
-  {
-    slug: 'commercial-street',
-    name: 'Commercial Street & Tasker Town',
-    tagline: 'Centuries of bespoke tailoring, embroidery & silk houses',
-    curatorNote: 'Bargain with respect in the inner alleys for raw textiles',
-    shopCount: 52,
-    image: 'https://images.unsplash.com/photo-1582510003544-4d00b7f74220?q=80&w=800&auto=format&fit=crop',
-  },
-  {
-    slug: 'malleshwaram',
-    name: 'Malleshwaram 8th Cross & Heritage Spine',
-    tagline: 'Temple flower lanes, Mysore sandalwood & filter coffee institutions',
-    curatorNote: 'Pair with Brahmin’s Coffee Bar filter decoction at 6:30 AM',
-    shopCount: 38,
-    image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=800&auto=format&fit=crop',
-  },
-];
-
-const STORIES = [
-  {
-    id: 'story-1',
-    title: 'The Alchemist of 100ft Road: 40 Years of Natural Dyeing',
-    author: 'Suniti Sharma',
-    time: '4 min read',
-    neighborhood: 'Indiranagar',
-    image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=600&auto=format&fit=crop',
-    quote: 'Synthetic color is flat. Indigo breathes with humidity and sunlight.',
-  },
-  {
-    id: 'story-2',
-    title: 'Why Bangalore’s Filter Coffee Decant Cannot Be Digitized',
-    author: 'Arjun Nambiar',
-    time: '6 min read',
-    neighborhood: 'Shankarpuram',
-    image: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?q=80&w=600&auto=format&fit=crop',
-    quote: 'The froth in the brass dabarah tells you the water temperature before your lips do.',
-  },
-  {
-    id: 'story-3',
-    title: 'Preserving Mysore Zari: Inside a 3rd Generation Weaving Room',
-    author: 'Meera Rao',
-    time: '5 min read',
-    neighborhood: 'Commercial Street',
-    image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=600&auto=format&fit=crop',
-    quote: 'A single saree takes 280 hours of hand pedal coordination.',
-  },
-];
-
-export default function HomePage({}: Props) {
+export default function HomePage({ query, shops: liveShops }: Props) {
   const router = useRouter();
-  const { user, createReservation, showToast } = useStore();
+  const { navTo, openShop, userLocation, requestUserLocation } = useStore();
+  const [heroSearch, setHeroSearch] = useState('');
+  const [selectedCity, setSelectedCity] = useState('Meerut');
+  const [locating, setLocating] = useState(false);
+  const [heroSelectedShop, setHeroSelectedShop] = useState<Shop | null>(null);
 
-  const [reserveModalItem, setReserveModalItem] = useState<any | null>(null);
-  const [confirmedPass, setConfirmedPass] = useState<any | null>(null);
-  const [customerName, setCustomerName] = useState(user?.name || 'Rohan Mehta');
-  const [customerPhone, setCustomerPhone] = useState(user?.phone || '+91 98450 99881');
-  const [pickupWindow, setPickupWindow] = useState('Tomorrow (3 PM - 7 PM)');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const allShops = liveShops && liveShops.length > 0 ? liveShops : SHOPS;
 
-  // Free coffee pass state
-  const [claimedCoffee, setClaimedCoffee] = useState(false);
+  // Flatten products from shops for popular products grid
+  const popularProducts = allShops.flatMap((s) =>
+    (s.products || []).map((p) => ({
+      ...p,
+      shopId: s.id,
+      shopName: s.name,
+    }))
+  ).slice(0, 8);
 
-  const handleClaimCoffeePass = () => {
-    const pass = createReservation({
-      productId: 'brahmin-pass-1',
-      productName: "Brahmin's Coffee Bar 1932 Filter Coffee Pass",
-      productImage: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?q=80&w=800&auto=format&fit=crop',
-      price: 250,
-      shopId: 'brahmins-coffee',
-      shopName: "Brahmin's Coffee Bar",
-      shopAddress: 'Ranga Rao Road, Shankarpuram, Bangalore',
-      shopPhone: '+91 80 2667 9999',
-      shopLocation: [12.9463, 77.5684],
-      customerName,
-      customerPhone,
-      pickupDate: 'Valid Today Anytime',
-      timeSlot: '6:00 AM - 7:30 PM',
-    });
-    setClaimedCoffee(true);
-    showToast(`Coffee Pass Claimed! OTP: ${pass.otp}`);
+  const featuredShops = allShops.slice(0, 4);
+  const nearbyShops = allShops.slice(0, 6);
+
+  const handleEnableLocation = async () => {
+    setLocating(true);
+    await requestUserLocation();
+    setLocating(false);
   };
 
-  const handleConfirmReservation = (e: React.FormEvent) => {
+  const handleHeroSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reserveModalItem) return;
-    setIsSubmitting(true);
+    navTo('shops');
+    router.push(`/explorer/shops?q=${encodeURIComponent(heroSearch)}`);
+  };
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      const pass = createReservation({
-        productId: reserveModalItem.id,
-        productName: reserveModalItem.name,
-        productImage: reserveModalItem.image,
-        price: reserveModalItem.price,
-        shopId: 'maya-studio',
-        shopName: reserveModalItem.atelier,
-        shopAddress: reserveModalItem.address,
-        shopPhone: '+91 80 4123 9988',
-        customerName,
-        customerPhone,
-        pickupDate: pickupWindow,
-        timeSlot: '3:00 PM - 7:00 PM',
-      });
-      setConfirmedPass(pass);
-    }, 400);
+  const handleCategoryClick = (catId: string) => {
+    navTo('shops');
+    router.push(`/explorer/shops?category=${catId}`);
   };
 
   return (
-    <div className="space-y-16 pb-24 text-[#1b1c19] selection:bg-[#f0e9ba]">
-      {/* ─────────────────────────────────────────────────────────────
-          1. HERO SECTION: "The Return of the Tactile City"
-          ───────────────────────────────────────────────────────────── */}
-      <section className="relative rounded-3xl overflow-hidden border border-[rgba(72,55,47,0.12)] bg-[#ffffff] shadow-[0_12px_32px_-4px_rgba(72,55,47,0.06)] p-6 sm:p-12 lg:p-16">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-          {/* Left Column (5 Cols): Editorial Masthead */}
-          <div className="lg:col-span-6 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#efeee9] text-[#54512d] text-[11px] font-mono font-bold tracking-widest uppercase">
-              <span className="w-2 h-2 rounded-full bg-[#54512d] animate-pulse" />
-              INDIRANAGAR • BANGALORE EDITORIAL
-            </div>
+    <div className="min-h-screen bg-[#FAFAF8] pb-16">
+      {/* ── 1. Hero Section with Embedded Live Discovery Map ──────────────── */}
+      <section className="relative bg-[#171717] text-white py-8 sm:py-10 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        {/* Background Texture Overlay */}
+        <div
+          className="absolute inset-0 opacity-15 bg-cover bg-center"
+          style={{
+            backgroundImage: `url('https://images.unsplash.com/photo-1596178065887-1198b6148b2b?q=80&w=1600&auto=format&fit=crop')`,
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/80 to-black/90" />
 
-            <h1 className="font-serif text-4xl sm:text-6xl font-bold tracking-tight text-[#1b1c19] leading-[1.1]">
-              The Return of the <span className="italic font-normal text-[#54512d]">Tactile City</span>.
-            </h1>
-
-            <p className="text-sm sm:text-base text-[#49473c] leading-relaxed font-normal">
-              Locara bridges independent physical craft with digital discovery. Reserve verified offline drop items with zero fee, walk your neighborhood, and pay upon real-world inspection.
-            </p>
-
-            <div className="flex flex-wrap items-center gap-4 pt-2">
-              <button
-                type="button"
-                onClick={() => router.push('/products')}
-                className="btn-primary-irl text-sm py-3 px-6 shadow-md"
-              >
-                <span>Browse Verified Drops →</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => router.push('/map')}
-                className="btn-secondary-olive text-sm py-3 px-6"
-              >
-                <MapPin className="w-4 h-4" />
-                <span>Live Walking Map</span>
-              </button>
-            </div>
-
-            {/* Quick Metrics */}
-            <div className="pt-6 border-t border-[#cbc6b8]/40 grid grid-cols-3 gap-4 text-left">
-              <div>
-                <span className="font-serif text-2xl font-bold text-[#1b1c19] block">120+</span>
-                <span className="text-[11px] font-mono text-[#7a776b] uppercase">Ateliers</span>
-              </div>
-              <div>
-                <span className="font-serif text-2xl font-bold text-[#54512d] block">100%</span>
-                <span className="text-[11px] font-mono text-[#7a776b] uppercase">Verified IRL</span>
-              </div>
-              <div>
-                <span className="font-serif text-2xl font-bold text-[#6e5a51] block">48H</span>
-                <span className="text-[11px] font-mono text-[#7a776b] uppercase">Free Holds</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column (7 Cols): Staggered Asymmetric Image Gallery */}
-          <div className="lg:col-span-6 grid grid-cols-2 gap-4">
-            <div className="space-y-4">
-              <div className="aspect-[4/5] rounded-2xl overflow-hidden border border-[rgba(72,55,47,0.15)] shadow-sm relative group">
-                <img
-                  src="https://images.unsplash.com/photo-1596178065887-1198b6148b2b?q=80&w=800&auto=format&fit=crop"
-                  alt="Bangalore Courtyard"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                />
-                <div className="absolute bottom-3 left-3 right-3 bg-[#ffffff]/90 backdrop-blur-md p-2.5 rounded-xl text-[11px] font-bold text-[#1b1c19]">
-                  📍 100ft Road Courtyard Atelier
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[#f5f4ef] border border-[#cbc6b8]/50 text-center space-y-1">
-                <span className="text-[10px] font-mono text-[#54512d] uppercase font-bold">COMMUNITY CURATION</span>
-                <p className="font-serif text-xs font-bold text-[#1b1c19]">
-                  &ldquo;Support the hands that weave your city.&rdquo;
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4 pt-6">
-              <div className="p-4 rounded-2xl bg-[#f0e9ba]/30 border border-[#54512d]/30 space-y-1.5">
-                <span className="text-[10px] font-mono text-[#54512d] font-bold uppercase">TODAY&apos;S SPOTLIGHT</span>
-                <h4 className="font-serif text-sm font-bold text-[#1b1c19]">Maya Studio & Weavers</h4>
-                <p className="text-[11px] text-[#49473c]">Mulberry katan handloom drop just added.</p>
-              </div>
-
-              <div className="aspect-[4/5] rounded-2xl overflow-hidden border border-[rgba(72,55,47,0.15)] shadow-sm relative group">
-                <img
-                  src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=800&auto=format&fit=crop"
-                  alt="Silk Weave"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                />
-                <div className="absolute top-3 right-3 badge-curator backdrop-blur-md bg-[#ffffff]/90">
-                  ★ Curators Pick
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ─────────────────────────────────────────────────────────────
-          2. EXPLORER PASS BANNER: Brahmin's Coffee Bar
-          ───────────────────────────────────────────────────────────── */}
-      <section className="rounded-2xl border border-[rgba(72,55,47,0.12)] bg-[#faf9f4] p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-sm">
-        <div className="flex items-center gap-5">
-          <div className="w-16 h-16 rounded-2xl bg-[#54512d] text-[#f0e9ba] flex items-center justify-center shrink-0 shadow-sm">
-            <Coffee className="w-8 h-8" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-[#f0e9ba] text-[#54512d] text-[10px] font-mono font-bold uppercase">
-                HERITAGE EXPLORER PERK
+        <div className="relative max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            {/* Left Column: Title, Subtitle, Search & Filter Tags */}
+            <div className="lg:col-span-6 space-y-4 text-left">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#A85420]/30 text-[#F5DECD] border border-[#A85420]/40">
+                <Sparkles className="w-3.5 h-3.5 text-[#A85420]" />
+                Local Marketplace of Meerut & Heritage Bazaars
               </span>
-              <span className="text-[11px] text-[#7a776b]">Est. 1932 Shankarpuram</span>
-            </div>
-            <h3 className="font-serif text-xl font-bold text-[#1b1c19] mt-1">
-              Brahmin&apos;s Coffee Bar • Traditional Filter Coffee Pass
-            </h3>
-            <p className="text-xs text-[#49473c] mt-0.5">
-              Locara Level 3 explorers receive a complimentary freshly brewed brass dabarah decoction.
-            </p>
-          </div>
-        </div>
 
-        <button
-          type="button"
-          onClick={handleClaimCoffeePass}
-          disabled={claimedCoffee}
-          className={`px-6 py-3 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
-            claimedCoffee
-              ? 'bg-[#e8f5e9] text-[#2e7d32] border border-[#2e7d32]'
-              : 'bg-[#48372f] hover:bg-[#3d2d26] text-[#faf9f4] shadow-sm'
-          }`}
-        >
-          {claimedCoffee ? '✓ Pass Saved in Reservations' : 'Claim In-Store Pass (Free) →'}
-        </button>
-      </section>
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white leading-tight">
+                Find shops & products <br /> near you
+              </h1>
 
-      {/* ─────────────────────────────────────────────────────────────
-          3. VERIFIED OFFLINE DROPS (Physical Inventory)
-          ───────────────────────────────────────────────────────────── */}
-      <section className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 border-b border-[#cbc6b8]/50 pb-4">
-          <div>
-            <span className="text-[10px] font-mono text-[#54512d] font-bold uppercase tracking-widest block mb-1">
-              PHYSICAL INVENTORY IN YOUR NEIGHBORHOOD
-            </span>
-            <h2 className="font-serif text-2xl sm:text-4xl font-bold text-[#1b1c19]">
-              Verified Offline Drops
-            </h2>
-          </div>
+              <p className="text-xs sm:text-sm text-gray-300 max-w-xl leading-relaxed">
+                Discover authentic heritage stores, artisanal workshops, and trusted local merchants across Meerut. Reserve products online with a 10% advance deposit.
+              </p>
 
-          <button
-            onClick={() => router.push('/products')}
-            className="text-xs font-bold text-[#54512d] hover:text-[#1b1c19] underline underline-offset-4 decoration-[#c8a1b1] self-start sm:self-auto"
-          >
-            View All 48 Drops →
-          </button>
-        </div>
+              {/* Search Form with City Selector */}
+              <form
+                onSubmit={handleHeroSearch}
+                className="bg-white p-2 rounded-xl shadow-xl flex flex-col sm:flex-row items-center gap-2 max-w-xl"
+              >
+                <div className="flex items-center gap-2 px-3 py-2 text-gray-700 w-full sm:w-auto border-b sm:border-b-0 sm:border-r border-gray-200">
+                  <MapPin className="w-4 h-4 text-[#A85420] shrink-0" />
+                  <select
+                    value={selectedCity}
+                    onChange={(e) => setSelectedCity(e.target.value)}
+                    className="text-xs font-bold text-gray-800 bg-transparent outline-none cursor-pointer"
+                  >
+                    <option value="Meerut">Meerut</option>
+                    <option value="Delhi NCR">Delhi NCR</option>
+                    <option value="Jaipur">Jaipur</option>
+                    <option value="Agra">Agra</option>
+                  </select>
+                </div>
 
-        {/* Drops Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {DROPS.map((item) => (
-            <div
-              key={item.id}
-              className="editorial-card group flex flex-col justify-between overflow-hidden"
-            >
-              <div>
-                <div className="relative aspect-[4/3] bg-[#efeee9] overflow-hidden">
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                <div className="flex-1 flex items-center gap-2 px-3 w-full">
+                  <Search className="w-4 h-4 text-gray-400 shrink-0" />
+                  <input
+                    type="text"
+                    value={heroSearch}
+                    onChange={(e) => setHeroSearch(e.target.value)}
+                    placeholder="Search shops, handicrafts, fashion..."
+                    className="w-full text-xs sm:text-sm text-gray-900 placeholder:text-gray-400 outline-none bg-transparent"
                   />
-                  <div className="absolute top-2.5 right-2.5 badge-distance backdrop-blur-md bg-[#ffffff]/90">
-                    <MapPin className="w-3 h-3 text-[#54512d]" />
-                    {item.distance}
-                  </div>
-                  <div className="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-full bg-[#1b1c19]/80 text-[#faf9f4] text-[9px] font-mono uppercase">
-                    {item.stock} left in atelier
-                  </div>
                 </div>
 
-                <div className="p-4 space-y-2">
-                  <span className="text-[10px] font-mono text-[#6d6943] uppercase font-bold block">
-                    {item.atelier} • {item.neighborhood}
-                  </span>
-                  <h3 className="font-serif text-base font-bold text-[#1b1c19] leading-snug group-hover:text-[#54512d] transition-colors line-clamp-1">
-                    {item.name}
-                  </h3>
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="font-serif text-base font-bold text-[#1b1c19]">
-                      ₹{item.price.toLocaleString('en-IN')}
-                    </span>
-                    <span className="text-[10px] font-mono text-[#7a776b]">
-                      48h hold
-                    </span>
-                  </div>
-                </div>
+                <button
+                  type="submit"
+                  className="w-full sm:w-auto px-5 py-2.5 bg-[#A85420] hover:bg-[#873F17] text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shrink-0 shadow-sm"
+                >
+                  <span>Search</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </form>
+
+              {/* Quick Filter Tags */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleEnableLocation}
+                  disabled={locating}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/10 hover:bg-white/20 text-white border border-white/15 flex items-center gap-1.5 transition-colors"
+                >
+                  <LocateFixed className="w-3.5 h-3.5 text-blue-400" />
+                  <span>{locating ? 'Locating...' : 'Near Me'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCategoryClick('handicrafts')}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-colors"
+                >
+                  🎨 Handicrafts
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCategoryClick('fashion')}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-colors"
+                >
+                  👗 Fashion
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCategoryClick('food')}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-colors"
+                >
+                  🍲 Sweets & Food
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCategoryClick('jewellery')}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-colors"
+                >
+                  💎 Jewellery
+                </button>
               </div>
 
-              <div className="p-4 pt-0">
+              {/* Quick Action Links */}
+              <div className="flex items-center gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => {
-                    setReserveModalItem(item);
-                    setConfirmedPass(null);
+                    navTo('map');
+                    router.push('/map');
                   }}
-                  className="w-full py-2.5 rounded-full bg-[#48372f] hover:bg-[#3d2d26] text-[#faf9f4] text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                  className="px-4 py-2 bg-[#A85420] hover:bg-[#873F17] text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-md transition-colors"
                 >
-                  <QrCode className="w-3.5 h-3.5" />
-                  <span>Reserve In-Store Pass</span>
+                  <MapIcon className="w-3.5 h-3.5" />
+                  <span>Explore Full Map</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navTo('shops');
+                    router.push('/explorer/shops');
+                  }}
+                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-lg border border-white/20 transition-colors"
+                >
+                  Browse All Stores ({allShops.length})
                 </button>
               </div>
             </div>
-          ))}
-        </div>
-      </section>
 
-      {/* ─────────────────────────────────────────────────────────────
-          4. ATELIER OF THE WEEK SPOTLIGHT
-          ───────────────────────────────────────────────────────────── */}
-      <section className="rounded-3xl border border-[rgba(72,55,47,0.12)] bg-[#ffffff] p-6 sm:p-12 shadow-[0_12px_32px_-4px_rgba(72,55,47,0.06)]">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-          <div className="lg:col-span-6 space-y-5">
-            <span className="px-3 py-1 rounded-full bg-[#f0e9ba] text-[#54512d] text-[10px] font-mono font-bold uppercase tracking-wider inline-block">
-              ATELIER OF THE WEEK
-            </span>
-            <h2 className="font-serif text-3xl sm:text-4xl font-bold text-[#1b1c19]">
-              Maya Studio & Weavers
-            </h2>
-            <p className="text-xs sm:text-sm text-[#49473c] leading-relaxed">
-              Founded on Indiranagar 100ft Road, Maya Studio collaborates with master pit-loom weavers from Gadag and Kanchipuram to preserve authentic handloom pure silks and vegetable-dyed ikats.
-            </p>
-
-            <div className="space-y-2 pt-2 text-xs text-[#49473c]">
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-[#54512d]" />
-                <span>428, 100ft Road, Indiranagar, Bangalore</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-[#54512d]" />
-                <span>Open Today: 10:30 AM – 8:30 PM • Walk-ins Welcomed</span>
-              </div>
-            </div>
-
-            <div className="pt-4 flex items-center gap-4">
-              <button
-                onClick={() => router.push('/shops/maya-studio')}
-                className="btn-primary-irl text-xs py-2.5 px-5"
-              >
-                Visit Atelier Profile →
-              </button>
-              <button
-                onClick={() => {
-                  window.open('https://www.google.com/maps/dir/?api=1&destination=12.9716,77.6412', '_blank');
-                }}
-                className="btn-secondary-olive text-xs py-2.5 px-5"
-              >
-                Get Directions
-              </button>
-            </div>
-          </div>
-
-          <div className="lg:col-span-6 grid grid-cols-2 gap-4">
-            <img
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=600&auto=format&fit=crop"
-              alt="Maya Rao"
-              className="w-full aspect-[4/5] object-cover rounded-2xl border border-[#cbc6b8]"
-            />
-            <img
-              src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=600&auto=format&fit=crop"
-              alt="Silk Loom"
-              className="w-full aspect-[4/5] object-cover rounded-2xl border border-[#cbc6b8]"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* ─────────────────────────────────────────────────────────────
-          5. HOW TO PURCHASE IN PERSON (3 Steps)
-          ───────────────────────────────────────────────────────────── */}
-      <section className="bg-[#faf9f4] border border-[rgba(72,55,47,0.12)] rounded-3xl p-6 sm:p-12 text-center space-y-8">
-        <div>
-          <span className="text-[10px] font-mono text-[#54512d] font-bold uppercase tracking-widest">
-            THE TACTILE COMMERCE PROTOCOL
-          </span>
-          <h2 className="font-serif text-2xl sm:text-4xl font-bold text-[#1b1c19] mt-1">
-            How to Purchase In Person
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-          <div className="p-6 rounded-2xl bg-[#ffffff] border border-[rgba(72,55,47,0.12)] shadow-sm space-y-3">
-            <span className="w-8 h-8 rounded-full bg-[#efeee9] text-[#54512d] font-bold flex items-center justify-center font-mono text-sm">
-              01
-            </span>
-            <h3 className="font-serif text-lg font-bold text-[#1b1c19]">Lock Online</h3>
-            <p className="text-xs text-[#49473c] leading-relaxed">
-              Find limited offline drops in your neighborhood and reserve your unit with a single click. Zero advance fee required.
-            </p>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-[#ffffff] border border-[rgba(72,55,47,0.12)] shadow-sm space-y-3">
-            <span className="w-8 h-8 rounded-full bg-[#efeee9] text-[#54512d] font-bold flex items-center justify-center font-mono text-sm">
-              02
-            </span>
-            <h3 className="font-serif text-lg font-bold text-[#1b1c19]">Walk to Atelier</h3>
-            <p className="text-xs text-[#49473c] leading-relaxed">
-              Follow turn-by-turn walking routes through historic bazaars, discover hidden alleys, and meet the artisans.
-            </p>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-[#ffffff] border border-[rgba(72,55,47,0.12)] shadow-sm space-y-3">
-            <span className="w-8 h-8 rounded-full bg-[#efeee9] text-[#54512d] font-bold flex items-center justify-center font-mono text-sm">
-              03
-            </span>
-            <h3 className="font-serif text-lg font-bold text-[#1b1c19]">Inspect & Pay</h3>
-            <p className="text-xs text-[#49473c] leading-relaxed">
-              Show your 6-digit OTP code at the counter. Feel the textile weight, inspect stitching, and complete counter checkout.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ─────────────────────────────────────────────────────────────
-          6. CULTURAL BAZAARS & MARKETS
-          ───────────────────────────────────────────────────────────── */}
-      <section className="space-y-6">
-        <div className="flex items-end justify-between border-b border-[#cbc6b8]/50 pb-4">
-          <div>
-            <span className="text-[10px] font-mono text-[#54512d] font-bold uppercase tracking-widest block mb-1">
-              NEIGHBORHOOD WALKING TRAILS
-            </span>
-            <h2 className="font-serif text-2xl sm:text-4xl font-bold text-[#1b1c19]">
-              Cultural Bazaars & Markets
-            </h2>
-          </div>
-          <button
-            onClick={() => router.push('/markets')}
-            className="text-xs font-bold text-[#54512d] hover:underline"
-          >
-            All Markets →
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {BAZAARS.map((bazaar) => (
-            <div
-              key={bazaar.slug}
-              onClick={() => router.push(`/markets/${bazaar.slug}`)}
-              className="editorial-card group cursor-pointer overflow-hidden flex flex-col justify-between"
-            >
-              <div>
-                <div className="aspect-[16/10] bg-[#efeee9] overflow-hidden relative">
-                  <img
-                    src={bazaar.image}
-                    alt={bazaar.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute top-3 right-3 px-2.5 py-0.5 rounded-full bg-[#1b1c19]/80 text-[#faf9f4] text-[10px] font-mono">
-                    {bazaar.shopCount} Verified Ateliers
+            {/* Right Column: Embedded Interactive Discovery Map */}
+            <div className="lg:col-span-6 w-full">
+              <div className="bg-black/50 p-2.5 sm:p-3 rounded-2xl border border-white/15 backdrop-blur-md shadow-2xl space-y-2">
+                {/* Map Header Bar */}
+                <div className="flex items-center justify-between px-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="font-bold text-white">Live Discovery Map</span>
+                    <span className="text-[11px] text-gray-300 bg-white/10 px-2 py-0.5 rounded-full">
+                      {allShops.length} Shops in {selectedCity}
+                    </span>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navTo('map');
+                      router.push('/map');
+                    }}
+                    className="text-xs text-[#F5DECD] hover:text-white font-bold flex items-center gap-1"
+                  >
+                    <span>Full View</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
                 </div>
 
-                <div className="p-5 space-y-2">
-                  <h3 className="font-serif text-lg font-bold text-[#1b1c19] group-hover:text-[#54512d] transition-colors">
-                    {bazaar.name}
-                  </h3>
-                  <p className="text-xs text-[#49473c] leading-relaxed">
-                    {bazaar.tagline}
-                  </p>
-                  <p className="text-[11px] text-[#54512d] italic font-serif pt-1">
-                    &ldquo;{bazaar.curatorNote}&rdquo;
-                  </p>
+                {/* Leaflet Map Preview Container */}
+                <div className="h-[340px] sm:h-[380px] w-full rounded-xl overflow-hidden border border-white/10">
+                  <LeafletShopMap
+                    shops={allShops}
+                    selectedShop={heroSelectedShop}
+                    onSelectShop={(s) => {
+                      setHeroSelectedShop(s);
+                    }}
+                    onNavigateToShop={(s) => {
+                      const lat = s.loc?.[0] || 28.9845;
+                      const lng = s.loc?.[1] || 77.7064;
+                      window.open(getGoogleDirectionsUrl(lat, lng, s.name), '_blank', 'noopener,noreferrer');
+                    }}
+                    userLocation={
+                      userLocation.latitude !== null && userLocation.longitude !== null
+                        ? { lat: userLocation.latitude, lng: userLocation.longitude }
+                        : null
+                    }
+                    onRequestUserLocation={handleEnableLocation}
+                    className="w-full h-full"
+                  />
                 </div>
-              </div>
-
-              <div className="p-5 pt-0 flex items-center justify-between text-xs font-bold text-[#54512d]">
-                <span>Explore Walking Trail</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
               </div>
             </div>
-          ))}
+          </div>
         </div>
       </section>
 
-      {/* ─────────────────────────────────────────────────────────────
-          7. SECRET ADDRESS BOOK CHRONICLES
-          ───────────────────────────────────────────────────────────── */}
-      <section className="space-y-6">
-        <div className="flex items-end justify-between border-b border-[#cbc6b8]/50 pb-4">
-          <div>
-            <span className="text-[10px] font-mono text-[#54512d] font-bold uppercase tracking-widest block mb-1">
-              FIELD NOTES & ESSAYS
-            </span>
-            <h2 className="font-serif text-2xl sm:text-4xl font-bold text-[#1b1c19]">
-              The Secret Address Book
-            </h2>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 mt-8">
+        {/* ── 2. Categories Row ─────────────────────────────── */}
+        <section>
+          <div className="flex items-center justify-between overflow-x-auto no-scrollbar gap-4 pb-2">
+            {CATEGORIES.map((cat) => {
+              const Icon = cat.icon;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => handleCategoryClick(cat.id)}
+                  className="flex flex-col items-center gap-2 group min-w-[72px] text-center"
+                >
+                  <div
+                    className={`w-14 h-14 rounded-full ${cat.color} flex items-center justify-center transition-transform duration-200 group-hover:scale-110 shadow-sm border border-black/5`}
+                  >
+                    <Icon className="w-6 h-6" />
+                  </div>
+                  <span className="text-xs font-semibold text-[#171717] group-hover:text-[#A85420]">
+                    {cat.label}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-          <button
-            onClick={() => router.push('/stories')}
-            className="text-xs font-bold text-[#54512d] hover:underline"
-          >
-            All Field Notes →
-          </button>
-        </div>
+        </section>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {STORIES.map((story) => (
-            <div
-              key={story.id}
-              onClick={() => router.push('/stories')}
-              className="p-6 rounded-2xl bg-[#ffffff] border border-[rgba(72,55,47,0.12)] hover:border-[#54512d]/40 shadow-sm transition-all space-y-4 cursor-pointer flex flex-col justify-between"
+        {/* ── 3. How Locara In-Store Pickup Works ───────────── */}
+        <section className="bg-white border border-[#E5E5E5] rounded-xl p-4 sm:p-6 shadow-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-[#E5E5E5]">
+            <div className="flex items-start gap-3 pt-3 sm:pt-0 sm:pr-3">
+              <div className="w-8 h-8 rounded-full bg-[#FBF3EE] text-[#A85420] font-bold text-xs flex items-center justify-center shrink-0">
+                1
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-[#171717]">Discover Local Shops</h4>
+                <p className="text-[11px] text-[#666666] mt-0.5">Explore authentic heritage & artisanal shops in Meerut.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 pt-3 sm:pt-0 sm:px-3">
+              <div className="w-8 h-8 rounded-full bg-[#FBF3EE] text-[#A85420] font-bold text-xs flex items-center justify-center shrink-0">
+                2
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-[#171717]">Reserve Online (10%)</h4>
+                <p className="text-[11px] text-[#666666] mt-0.5">Hold exclusive products with a small 10% advance deposit.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 pt-3 sm:pt-0 sm:px-3">
+              <div className="w-8 h-8 rounded-full bg-[#FBF3EE] text-[#A85420] font-bold text-xs flex items-center justify-center shrink-0">
+                3
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-[#171717]">Get Instant Pass</h4>
+                <p className="text-[11px] text-[#666666] mt-0.5">Receive your verified 6-digit OTP & digital QR pass.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 pt-3 sm:pt-0 sm:pl-3">
+              <div className="w-8 h-8 rounded-full bg-[#FBF3EE] text-[#A85420] font-bold text-xs flex items-center justify-center shrink-0">
+                4
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-[#171717]">Pickup & Pay Balance</h4>
+                <p className="text-[11px] text-[#666666] mt-0.5">Visit the shop, inspect the product, and pay 90% balance.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── 4. Featured Shops (Horizontal Cards) ─────────── */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg sm:text-xl font-bold text-[#171717]">Featured Shops</h2>
+              <p className="text-xs text-[#666666]">Handpicked heritage institutions & iconic stores</p>
+            </div>
+            <button
+              onClick={() => {
+                navTo('shops');
+                router.push('/explorer/shops');
+              }}
+              className="text-xs font-bold text-[#A85420] hover:text-[#873F17] flex items-center gap-1"
             >
-              <div className="space-y-3">
-                <div className="aspect-[16/9] rounded-xl overflow-hidden bg-[#efeee9]">
-                  <img
-                    src={story.image}
-                    alt={story.title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="flex items-center justify-between text-[10px] font-mono text-[#7a776b]">
-                  <span>{story.neighborhood}</span>
-                  <span>{story.time}</span>
-                </div>
-                <h3 className="font-serif text-base font-bold text-[#1b1c19] leading-snug">
-                  {story.title}
-                </h3>
-                <p className="text-xs text-[#54512d] font-serif italic">
-                  &ldquo;{story.quote}&rdquo;
+              <span>View All</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {featuredShops.map((shop) => (
+              <ShopCard key={shop.id} shop={shop} layout="grid" />
+            ))}
+          </div>
+        </section>
+
+        {/* ── 5. Popular Products (ProductCard Grid) ───────── */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg sm:text-xl font-bold text-[#171717]">Popular Products</h2>
+              <p className="text-xs text-[#666666]">Most loved traditional items & artisanal handicrafts</p>
+            </div>
+            <button
+              onClick={() => {
+                navTo('shops');
+                router.push('/explorer/shops');
+              }}
+              className="text-xs font-bold text-[#A85420] hover:text-[#873F17] flex items-center gap-1"
+            >
+              <span>View All</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+            {popularProducts.map((prod) => (
+              <ProductCard
+                key={prod.id}
+                product={prod}
+                shopId={prod.shopId}
+                shopName={prod.shopName}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* ── 6. Flash Sale / Festive Banner ──────────────── */}
+        <section className="bg-gradient-to-r from-[#A85420] to-[#6E3210] rounded-xl p-6 text-white shadow-md flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="space-y-2 text-center md:text-left">
+            <div className="inline-flex items-center gap-1 bg-white/20 text-white text-xs font-bold px-2.5 py-0.5 rounded">
+              <Flame className="w-3.5 h-3.5 text-amber-300" />
+              <span>Festive Season Special</span>
+            </div>
+            <h3 className="text-2xl font-extrabold">Flat 20% OFF on Local Handicrafts</h3>
+            <p className="text-xs text-orange-100 max-w-md">
+              Reserve your festive brass idols, decorative lighting, and handwoven textiles before stock runs out.
+            </p>
+          </div>
+
+          <button
+            onClick={() => {
+              navTo('shops');
+              router.push('/explorer/shops?category=handicrafts');
+            }}
+            className="px-6 py-3 bg-white text-[#A85420] hover:bg-[#F5F4F0] font-bold text-xs rounded-lg transition-colors shadow-sm shrink-0 flex items-center gap-1.5"
+          >
+            <span>Explore Offers</span>
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </section>
+
+        {/* ── 7. Shops Near You Section ─────────────── */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg sm:text-xl font-bold text-[#171717]">Shops Near You</h2>
+              <p className="text-xs text-[#666666]">
+                {userLocation.latitude !== null
+                  ? 'Real-time local stores ordered by distance from your location'
+                  : 'Open heritage stores and artisan merchants in your area'}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                navTo('map');
+                router.push('/map');
+              }}
+              className="text-xs font-bold text-[#A85420] hover:text-[#873F17] flex items-center gap-1"
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              <span>Explore on Map</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* If location permission is not granted yet, show the friendly CTA banner */}
+          {userLocation.latitude === null && (
+            <div className="bg-white border border-[#E5E5E5] rounded-xl p-6 text-center space-y-3 shadow-sm">
+              <div className="w-12 h-12 rounded-full bg-[#FBF3EE] text-[#A85420] flex items-center justify-center mx-auto border border-[#F5DECD]">
+                <MapPin className="w-6 h-6" />
+              </div>
+              <div className="space-y-1 max-w-md mx-auto">
+                <h3 className="text-sm font-bold text-[#171717]">Allow location to find shops near you</h3>
+                <p className="text-xs text-[#666666]">
+                  Discover nearby heritage institutions, artisan workshops, and local markets sorted by exact distance.
                 </p>
               </div>
-
-              <span className="text-[11px] font-bold text-[#48372f] block pt-2 border-t border-[#cbc6b8]/40">
-                By {story.author} →
-              </span>
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleEnableLocation}
+                  disabled={locating}
+                  className="px-5 py-2.5 bg-[#A85420] hover:bg-[#873F17] text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
+                >
+                  <LocateFixed className="w-4 h-4" />
+                  <span>{locating ? 'Detecting Location...' : 'Enable Location'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navTo('shops');
+                    router.push('/explorer/shops');
+                  }}
+                  className="px-5 py-2.5 bg-[#F5F4F0] hover:bg-[#EAE8E2] text-[#171717] text-xs font-bold rounded-lg border border-[#E5E5E5] transition-colors"
+                >
+                  Browse All Shops
+                </button>
+              </div>
             </div>
-          ))}
-        </div>
-      </section>
+          )}
 
-      {/* ─────────────────────────────────────────────────────────────
-      {/* ─────────────────────────────────────────────────────────────
-          10% ADVANCE PAYMENT & RESERVATION MODAL
-          ───────────────────────────────────────────────────────────── */}
-      {reserveModalItem && (
-        <ReservationDepositModal
-          item={{
-            id: reserveModalItem.id,
-            name: reserveModalItem.name,
-            image: reserveModalItem.image,
-            price: reserveModalItem.price,
-            shopId: 'maya-studio',
-            shopName: reserveModalItem.atelier,
-            address: reserveModalItem.address,
-            location: [12.9716, 77.6412],
-          }}
-          onClose={() => setReserveModalItem(null)}
-        />
-      )}
+          {/* Nearby Shop Cards */}
+          <div className="space-y-3">
+            {nearbyShops.slice(0, 4).map((shop) => (
+              <ShopCard key={shop.id} shop={shop} layout="list" />
+            ))}
+          </div>
+        </section>
+      </div>
+
+      {/* ── 8. Footer ────────────────────────────────────── */}
+      <footer className="mt-16 bg-white border-t border-[#E5E5E5] py-10 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 rounded-lg bg-[#A85420] flex items-center justify-center text-white font-bold text-sm">
+                L
+              </div>
+              <span className="font-extrabold text-lg tracking-tight text-[#171717]">LOCARA</span>
+            </div>
+            <p className="text-xs text-[#666666] leading-relaxed">
+              Your local marketplace for authentic heritage shops, traditional crafts, and trusted neighborhood merchants.
+            </p>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold text-[#171717] uppercase tracking-wider mb-3">Shop Categories</h4>
+            <ul className="space-y-2 text-xs text-[#666666]">
+              <li><button onClick={() => handleCategoryClick('handicrafts')} className="hover:text-[#A85420]">Handicrafts & Decor</button></li>
+              <li><button onClick={() => handleCategoryClick('fashion')} className="hover:text-[#A85420]">Fashion & Apparel</button></li>
+              <li><button onClick={() => handleCategoryClick('jewellery')} className="hover:text-[#A85420]">Traditional Jewellery</button></li>
+              <li><button onClick={() => handleCategoryClick('food')} className="hover:text-[#A85420]">Sweets & Local Food</button></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold text-[#171717] uppercase tracking-wider mb-3">Customer Service</h4>
+            <ul className="space-y-2 text-xs text-[#666666]">
+              <li><button onClick={() => router.push('/reservations')} className="hover:text-[#A85420]">My Pickup Passes</button></li>
+              <li><button onClick={() => router.push('/cart')} className="hover:text-[#A85420]">Pickup Bag</button></li>
+              <li><button onClick={() => router.push('/map')} className="hover:text-[#A85420]">Marketplace Map</button></li>
+              <li><span className="text-[#8A8A8A]">Help & Support: support@locara.app</span></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold text-[#171717] uppercase tracking-wider mb-3">For Shop Owners</h4>
+            <p className="text-xs text-[#666666] mb-3">
+              Are you a heritage or local merchant? List your shop and accept in-store drop reservations.
+            </p>
+            <button
+              onClick={() => router.push('/owner')}
+              className="px-4 py-2 bg-[#F5F4F0] hover:bg-[#A85420] hover:text-white text-[#171717] text-xs font-bold rounded-lg border border-[#E5E5E5] transition-colors"
+            >
+              Merchant Dashboard →
+            </button>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto mt-8 pt-6 border-t border-[#E5E5E5] flex flex-col sm:flex-row items-center justify-between text-xs text-[#8A8A8A] gap-2">
+          <span>© {new Date().getFullYear()} LOCARA Technologies. All rights reserved.</span>
+          <span>Made for local shop lovers in Meerut</span>
+        </div>
+      </footer>
     </div>
   );
 }

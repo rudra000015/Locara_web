@@ -1,3 +1,4 @@
+
 import { connectDb } from '@/lib/mongodb';
 import { Product, IProduct } from '@/models/Product';
 import { SEED_PRODUCTS } from '@/data/seedVisualSearchData';

@@ -1,88 +1,62 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
-import { CalendarCheck, QrCode, Clock, CheckCircle2, User, Phone, Sparkles } from 'lucide-react';
+import React, { useState } from 'react';
+import { Calendar, QrCode, Clock, CheckCircle2, User, Phone, ShoppingBag } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 import VerifyPickupModal from './VerifyPickupModal';
-import PremiumButton from '@/components/ui/PremiumButton';
 
 export default function SellerReservationsPage() {
-  const { ownerShopId, ownerShopName, showToast } = useStore();
-  const [reservations, setReservations] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'CONFIRMED' | 'COMPLETED' | 'EXPIRED'>('CONFIRMED');
-  const [verifyingReservation, setVerifyingReservation] = useState<any | null>(null);
+  const { reservations, ownerShopId } = useStore();
+  const shopReservations = reservations.filter((reservation) => reservation.shopId === ownerShopId);
+  const [activeTab, setActiveTab] = useState<'CONFIRMED' | 'COMPLETED' | 'ALL'>('CONFIRMED');
+  const [isVerifyOpen, setIsVerifyOpen] = useState(false);
 
-  const fetchReservations = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('auth_token') || '';
-      const res = await fetch(`/api/reservations?shopId=${ownerShopId}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setReservations(data.reservations || []);
-      }
-    } catch {} finally {
-      setLoading(false);
-    }
-  }, [ownerShopId]);
-
-  useEffect(() => {
-    void fetchReservations();
-  }, [fetchReservations]);
-
-  const filtered = reservations.filter((r) => {
-    if (activeTab === 'CONFIRMED') return r.status === 'CONFIRMED' || r.status === 'ACTIVE';
+  const filtered = shopReservations.filter((r) => {
+    if (activeTab === 'CONFIRMED') return r.status === 'CONFIRMED';
     if (activeTab === 'COMPLETED') return r.status === 'COMPLETED';
-    if (activeTab === 'EXPIRED') return r.status === 'EXPIRED' || r.status === 'CANCELLED';
     return true;
   });
 
   return (
     <div className="space-y-6 pb-16">
       {/* Header */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-[#17120E] border border-[#F6EAD7]/10 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="bg-white border border-[#E5E5E5] rounded-xl p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <CalendarCheck className="w-4 h-4 text-[#C8893F]" />
-            <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#C8893F]">
-              CUSTOMER RESERVATION MANAGER
-            </span>
-          </div>
-          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#F6EAD7]">
+          <h1 className="text-xl sm:text-2xl font-extrabold text-[#171717]">
             Store Reservations & Pickups
-          </h2>
-          <p className="text-xs text-[#9E8B75] mt-1">
-            Manage advance deposits, verify customer arrivals with QR/OTP, and record footfall.
+          </h1>
+          <p className="text-xs text-[#666666] mt-0.5">
+            Manage customer pickup orders, verify arrivals with OTP/QR, and collect in-store balances.
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() => setVerifyingReservation({ direct: true })}
-          className="px-4 py-2.5 rounded-xl bg-[#C8893F] hover:bg-[#E0AF62] text-xs font-bold text-[#0E0B08] flex items-center gap-2 shadow-glow-sm cursor-pointer shrink-0"
+          onClick={() => setIsVerifyOpen(true)}
+          className="px-4 py-2 bg-[#A85420] hover:bg-[#873F17] text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm shrink-0"
         >
           <QrCode className="w-4 h-4" />
-          <span>Verify Pickup OTP</span>
+          <span>Verify Pickup</span>
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-[#F6EAD7]/10 gap-2 overflow-x-auto no-scrollbar">
-        {[
-          { id: 'CONFIRMED', label: `Awaiting Pickup (${reservations.filter((r) => r.status === 'CONFIRMED' || r.status === 'ACTIVE').length})` },
-          { id: 'COMPLETED', label: `Completed (${reservations.filter((r) => r.status === 'COMPLETED').length})` },
-          { id: 'EXPIRED', label: 'Expired & Cancelled' },
-        ].map((tab) => (
+      <div className="flex border-b border-[#E5E5E5] gap-2">
+        {(
+          [
+            { id: 'CONFIRMED', label: `Awaiting Pickup (${shopReservations.filter((r) => r.status === 'CONFIRMED').length})` },
+            { id: 'COMPLETED', label: `Completed (${shopReservations.filter((r) => r.status === 'COMPLETED').length})` },
+            { id: 'ALL', label: `All Orders (${shopReservations.length})` },
+          ] as const
+        ).map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-colors ${
               activeTab === tab.id
-                ? 'border-[#C8893F] text-[#E0AF62]'
-                : 'border-transparent text-[#9E8B75] hover:text-[#F6EAD7]'
+                ? 'border-[#A85420] text-[#A85420]'
+                : 'border-transparent text-[#666666] hover:text-[#171717]'
             }`}
           >
             {tab.label}
@@ -91,106 +65,71 @@ export default function SellerReservationsPage() {
       </div>
 
       {/* List */}
-      {loading ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-32 rounded-3xl bg-[#17120E] skeleton-shimmer" />
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="p-16 rounded-3xl bg-[#17120E] border border-[#F6EAD7]/10 text-center max-w-md mx-auto my-6">
-          <div className="w-14 h-14 rounded-2xl bg-[#211A14] flex items-center justify-center text-2xl mx-auto mb-3">
-            📋
-          </div>
-          <h3 className="font-serif text-lg font-bold text-[#F6EAD7]">No reservations found</h3>
-          <p className="text-xs text-[#9E8B75] mt-1">
-            New explorer reservations for {ownerShopName} will appear here with instant pickup validation codes.
-          </p>
+      {filtered.length === 0 ? (
+        <div className="bg-white border border-[#E5E5E5] rounded-xl p-12 text-center text-xs text-[#666666]">
+          No reservations found in this category.
         </div>
       ) : (
         <div className="space-y-4">
-          {filtered.map((r, i) => {
-            const item = r.items?.[0] || {};
-            const isAwaiting = r.status === 'CONFIRMED' || r.status === 'ACTIVE';
-
-            return (
-              <motion.div
-                key={r.id || r.reservationNumber || i}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-5 sm:p-6 rounded-3xl bg-[#17120E] border border-[#F6EAD7]/10 hover:border-[#C8893F]/30 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-5"
-              >
-                <div className="flex items-start gap-4 min-w-0 flex-1">
-                  {item.image ? (
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="w-16 h-16 rounded-2xl object-cover bg-[#211A14] border border-[#F6EAD7]/10 shrink-0"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 rounded-2xl bg-[#261D16] flex items-center justify-center text-2xl shrink-0">
-                      🏛️
-                    </div>
-                  )}
-
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-mono text-xs font-bold text-[#E0AF62]">
-                        {r.reservationNumber}
-                      </span>
-                      <span className="text-xs text-[#9E8B75]">•</span>
-                      <span className="text-xs text-[#F6EAD7] flex items-center gap-1">
-                        <User className="w-3 h-3 text-[#C8893F]" /> {r.userName}
-                      </span>
-                    </div>
-
-                    <h4 className="font-serif font-bold text-base text-[#F6EAD7] truncate">{item.name}</h4>
-                    <div className="flex items-center gap-3 text-xs text-[#9E8B75] mt-0.5">
-                      <span>Qty: {item.quantity || 1}</span>
-                      {item.size && <span>• Size: {item.size}</span>}
-                      {item.color && <span>• Color: {item.color}</span>}
-                    </div>
-
-                    <div className="flex items-center gap-3 mt-2 text-xs font-mono">
-                      <span className="text-[#2D7D64] font-bold">10% Advance: ₹{r.advanceAmount}</span>
-                      <span className="text-[#E0AF62] font-bold">Collect In-Store: ₹{r.remainingAmount}</span>
-                    </div>
-                  </div>
+          {filtered.map((res) => (
+            <div
+              key={res.id}
+              className="bg-white border border-[#E5E5E5] rounded-xl p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-lg bg-[#F5F4F0] overflow-hidden border border-[#E5E5E5] shrink-0">
+                  <img
+                    src={res.productImage}
+                    alt={res.productName}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
-
-                <div className="flex items-center gap-3 w-full md:w-auto shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-[#F6EAD7]/10">
-                  {isAwaiting && (
-                    <button
-                      type="button"
-                      onClick={() => setVerifyingReservation(r)}
-                      className="w-full md:w-auto px-5 py-2.5 rounded-xl bg-[#C8893F] hover:bg-[#E0AF62] text-xs font-bold text-[#0E0B08] flex items-center justify-center gap-2 shadow-glow-sm cursor-pointer"
-                    >
-                      <QrCode className="w-4 h-4" /> Verify Customer Pickup
-                    </button>
-                  )}
-                  {r.status === 'COMPLETED' && (
-                    <span className="px-3 py-1.5 rounded-xl bg-[#1E5544]/20 border border-[#1E5544]/40 text-xs font-bold text-[#2D7D64] flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4" /> Verified & Completed
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-xs text-[#171717] bg-[#F5F4F0] px-2 py-0.5 rounded border border-[#E5E5E5]">
+                      {res.otp}
                     </span>
-                  )}
+                    <span className="font-bold text-sm text-[#171717]">{res.customerName}</span>
+                  </div>
+                  <p className="text-xs text-[#666666]">
+                    {res.productName} • Pickup: <strong className="text-[#171717]">{res.pickupDate} ({res.timeSlot})</strong>
+                  </p>
                 </div>
-              </motion.div>
-            );
-          })}
+              </div>
+
+              <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end pt-3 sm:pt-0 border-t sm:border-t-0 border-[#E5E5E5]">
+                <div className="text-left sm:text-right">
+                  <span className="text-xs text-[#16803C] font-semibold block">
+                    Paid Online: ₹{res.advancePaid}
+                  </span>
+                  <span className="text-sm font-bold text-[#A85420]">
+                    Collect: ₹{res.balanceDue}
+                  </span>
+                </div>
+
+                {res.status === 'CONFIRMED' && (
+                  <button
+                    type="button"
+                    onClick={() => setIsVerifyOpen(true)}
+                    className="px-4 py-2 bg-[#A85420] hover:bg-[#873F17] text-white text-xs font-bold rounded-lg transition-colors"
+                  >
+                    Verify
+                  </button>
+                )}
+                {res.status === 'COMPLETED' && (
+                  <span className="px-3 py-1 bg-[#EBF8F0] text-[#16803C] text-xs font-bold rounded-lg flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Collected</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Verify Pickup Modal */}
-      {verifyingReservation && (
-        <VerifyPickupModal
-          isOpen={Boolean(verifyingReservation)}
-          onClose={() => {
-            setVerifyingReservation(null);
-            void fetchReservations();
-          }}
-          reservationId={verifyingReservation.reservationNumber || verifyingReservation.id}
-          onVerified={() => void fetchReservations()}
-        />
+      {isVerifyOpen && (
+        <VerifyPickupModal onClose={() => setIsVerifyOpen(false)} />
       )}
     </div>
   );

@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     // Redirect to the actual Google-signed photo URL
     return NextResponse.redirect(photoUri, {
       headers: {
-        'Cache-Control': 'public, max-age=86400', // cache 24h
+        'Cache-Control': 'no-store',
       },
     });
   } catch (err: any) {

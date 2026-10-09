@@ -22,8 +22,17 @@ export function mapDbShopToShop(doc: any): Shop {
   return {
     id,
     placeId: raw.shopId ?? id,
+    source: 'locara',
     name: raw.name ?? "Local Shop",
-    cat: category,
+    cat: raw.subcategory || raw.category || category,
+    subcategory: raw.subcategory,
+    tags: raw.tags ?? [],
+    keywords: raw.keywords ?? [],
+    aiGeneratedDescription: raw.aiGeneratedDescription,
+    isHeritage: typeof raw.est === 'number' && new Date().getFullYear() - raw.est >= 100,
+    heritageYears: typeof raw.est === 'number' && new Date().getFullYear() - raw.est >= 100
+      ? new Date().getFullYear() - raw.est
+      : undefined,
     est: estYear,
     age,
     owner: raw.ownerName ?? "Shop Owner",
@@ -82,6 +91,7 @@ export function mapSeedShopToShop(seed: SeedShop): Shop {
   return {
     id: seed.id,
     placeId: seed.id,
+    source: 'curated',
     name: seed.name,
     cat: category,
     est: estYear,

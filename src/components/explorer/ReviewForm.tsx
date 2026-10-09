@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { Star, X, Sparkles } from 'lucide-react';
-import PremiumButton from '@/components/ui/PremiumButton';
+import React, { useState } from 'react';
+import { Star, X } from 'lucide-react';
+import { ReviewTag, REVIEW_TAGS } from '@/types/review';
 
 interface Props {
   shopId?: string;
@@ -11,17 +11,16 @@ interface Props {
     rating: number;
     title: string;
     body: string;
-    tags?: any[];
+    tags: ReviewTag[];
   }) => Promise<any>;
   submitting?: boolean;
-  hasExisting?: boolean;
-  onClose: () => void;
+  onClose?: () => void;
 }
 
-const STAR_LABELS = ['', 'Needs Improvement', 'Fair', 'Good', 'Very Good', 'Exceptional!'];
+const STAR_LABELS = ['', 'Poor', 'Fair', 'Good', 'Very Good', 'Exceptional!'];
 
 export default function ReviewForm({
-  shopName = 'Heritage Shop',
+  shopName = 'Shop',
   onSubmit,
   submitting = false,
   onClose,
@@ -30,10 +29,17 @@ export default function ReviewForm({
   const [hovered, setHovered] = useState(0);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [selectedTags, setSelectedTags] = useState<ReviewTag[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const activeStar = hovered || rating;
+
+  const toggleTag = (tag: ReviewTag) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,8 +56,9 @@ export default function ReviewForm({
         rating,
         title: title.trim() || `${STAR_LABELS[rating]} Experience`,
         body: body.trim(),
+        tags: selectedTags,
       });
-      onClose();
+      if (onClose) onClose();
     } catch (err: any) {
       setError(err?.message || 'Failed to submit review. Try again.');
     } finally {
@@ -60,109 +67,131 @@ export default function ReviewForm({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="w-full max-w-lg rounded-3xl bg-[#121212] border border-white/10 p-6 sm:p-8 shadow-2xl animate-scale-in">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#C9A96E]">
-              VERIFIED EXPERIENCE
-            </span>
-            <h3 className="font-serif font-bold text-xl text-[#F5F5F5] mt-0.5">
-              Review {shopName}
-            </h3>
-          </div>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex items-center justify-between pb-3 border-b border-[#E5E5E5]">
+        <div>
+          <h3 className="font-bold text-sm text-[#171717]">Write a Review for {shopName}</h3>
+          <p className="text-xs text-[#666666]">Share your feedback with local shoppers</p>
+        </div>
+        {onClose && (
           <button
+            type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-[#1C1C1C] flex items-center justify-center text-[#71717A] hover:text-[#F5F5F5]"
+            className="w-7 h-7 rounded-full bg-[#F5F4F0] flex items-center justify-center text-[#666666] hover:text-[#171717] hover:bg-[#E5E5E5] transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Star Picker */}
-          <div className="text-center p-4 rounded-2xl bg-[#181818] border border-white/5">
-            <div className="flex justify-center gap-2 mb-2">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onMouseEnter={() => setHovered(n)}
-                  onMouseLeave={() => setHovered(0)}
-                  onClick={() => setRating(n)}
-                  className="p-1 cursor-pointer transition-transform hover:scale-125"
-                >
-                  <Star
-                    className={`w-7 h-7 transition-colors ${
-                      activeStar >= n ? 'text-[#C9A96E] fill-[#C9A96E]' : 'text-white/20'
-                    }`}
-                  />
-                </button>
-              ))}
-            </div>
-            <p className="text-xs font-bold text-[#C9A96E] font-mono uppercase tracking-wider">
-              {STAR_LABELS[activeStar]}
-            </p>
-          </div>
-
-          {/* Title input */}
-          <div>
-            <label className="block text-[11px] font-mono uppercase text-[#71717A] mb-1.5 font-bold">
-              Headline / Summary
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Best traditional sweets in town"
-              className="w-full px-4 py-3 rounded-xl bg-[#181818] border border-white/10 text-xs text-[#F5F5F5] placeholder-[#52525B] outline-none focus:border-[#C9A96E] transition-colors"
-            />
-          </div>
-
-          {/* Body textarea */}
-          <div>
-            <label className="block text-[11px] font-mono uppercase text-[#71717A] mb-1.5 font-bold">
-              Detailed Experience
-            </label>
-            <textarea
-              rows={4}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Share details about the craftsmanship, authenticity, atmosphere, or recommended specialties..."
-              className="w-full px-4 py-3 rounded-xl bg-[#181818] border border-white/10 text-xs text-[#F5F5F5] placeholder-[#52525B] outline-none focus:border-[#C9A96E] transition-colors resize-none leading-relaxed"
-            />
-          </div>
-
-          {error && (
-            <p className="p-3 rounded-xl bg-[#ef4444]/10 border border-[#ef4444]/20 text-xs text-[#ef4444]">
-              {error}
-            </p>
-          )}
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 py-3 rounded-xl border border-white/10 text-xs font-bold text-[#A1A1AA] hover:bg-white/5 transition-all"
-            >
-              Cancel
-            </button>
-
-            <PremiumButton
-              variant="gold"
-              size="md"
-              type="submit"
-              disabled={loading || submitting}
-              className="flex-1"
-            >
-              {loading || submitting ? 'Submitting...' : 'Post Verified Review'}
-            </PremiumButton>
-          </div>
-        </form>
+        )}
       </div>
-    </div>
+
+      {/* Star Picker */}
+      <div className="p-4 rounded-xl bg-[#FAFAF8] border border-[#E5E5E5] text-center space-y-1.5">
+        <span className="text-[11px] font-bold text-[#666666] uppercase tracking-wider">
+          Your Rating
+        </span>
+        <div className="flex justify-center gap-1.5">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              type="button"
+              onMouseEnter={() => setHovered(n)}
+              onMouseLeave={() => setHovered(0)}
+              onClick={() => setRating(n)}
+              className="p-1 cursor-pointer transition-transform hover:scale-110"
+            >
+              <Star
+                className={`w-6 h-6 transition-colors ${
+                  activeStar >= n
+                    ? 'text-[#D97706] fill-[#D97706]'
+                    : 'text-[#E5E5E5]'
+                }`}
+              />
+            </button>
+          ))}
+        </div>
+        <p className="text-xs font-bold text-[#A85420]">
+          {STAR_LABELS[activeStar]}
+        </p>
+      </div>
+
+      {/* Quick Tags */}
+      <div>
+        <label className="block text-xs font-bold text-[#171717] mb-1.5">
+          Highlight Tags (Optional)
+        </label>
+        <div className="flex flex-wrap gap-1.5">
+          {REVIEW_TAGS.map((tag) => {
+            const isSelected = selectedTags.includes(tag);
+            return (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => toggleTag(tag)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                  isSelected
+                    ? 'bg-[#A85420]/10 text-[#A85420] border-[#A85420]/30 font-bold'
+                    : 'bg-[#FAFAF8] text-[#666666] border-[#E5E5E5] hover:border-[#CCCCCC]'
+                }`}
+              >
+                {isSelected ? '✓ ' : '+ '}{tag}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Title */}
+      <div>
+        <label className="block text-xs font-bold text-[#171717] mb-1">
+          Review Headline
+        </label>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="e.g. Authentic quality and friendly shop owner"
+          className="w-full px-3.5 py-2 text-xs rounded-lg bg-white border border-[#E5E5E5] text-[#171717] placeholder-[#8A8A8A] focus:outline-none focus:border-[#A85420]"
+        />
+      </div>
+
+      {/* Body */}
+      <div>
+        <label className="block text-xs font-bold text-[#171717] mb-1">
+          Your Review
+        </label>
+        <textarea
+          rows={3}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Tell others what you liked about the products, pickup experience, and pricing..."
+          className="w-full px-3.5 py-2 text-xs rounded-lg bg-white border border-[#E5E5E5] text-[#171717] placeholder-[#8A8A8A] focus:outline-none focus:border-[#A85420] resize-none"
+        />
+      </div>
+
+      {error && (
+        <div className="p-2.5 rounded-lg bg-[#DC2626]/10 border border-[#DC2626]/20 text-xs text-[#DC2626]">
+          {error}
+        </div>
+      )}
+
+      <div className="flex justify-end gap-2 pt-2">
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-xs font-bold text-[#666666] hover:text-[#171717] bg-[#F5F4F0] hover:bg-[#E5E5E5] rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+        )}
+        <button
+          type="submit"
+          disabled={loading || submitting}
+          className="px-5 py-2 text-xs font-bold text-white bg-[#A85420] hover:bg-[#873F17] rounded-lg transition-colors shadow-sm disabled:opacity-50"
+        >
+          {loading || submitting ? 'Submitting...' : 'Post Review'}
+        </button>
+      </div>
+    </form>
   );
 }

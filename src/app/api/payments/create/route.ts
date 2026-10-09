@@ -9,12 +9,16 @@ export async function POST(req: NextRequest) {
     let userName = "Locara Explorer";
     let userEmail = "";
 
-    if (token) {
-      try {
-        const auth = verifyAuthToken(token);
-        userId = auth.id;
-        userEmail = auth.email;
-      } catch {}
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    try {
+      const auth = verifyAuthToken(token);
+      userId = auth.id;
+      userEmail = auth.email;
+    } catch {
+      return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
 
     const body = await req.json();

@@ -1,89 +1,91 @@
 'use client';
 
+import React from 'react';
+import Image from 'next/image';
 import { useStore } from '@/store/useStore';
 import { useRouter } from 'next/navigation';
-import { Store, Compass, LogOut, Sparkles } from 'lucide-react';
-import ThemeToggle from '@/components/ui/ThemeToggle';
+import { Store, Compass, LogOut, LayoutDashboard, ShoppingBag, Calendar, BarChart3, Settings } from 'lucide-react';
 
 export default function OwnerHeader({ shopName }: { shopName: string }) {
   const router = useRouter();
   const { user, logout, navTo, ownerPage, ownerNavTo } = useStore();
 
+  const NAV_ITEMS = [
+    { id: 'showcase', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'products', label: 'Products', icon: ShoppingBag },
+    { id: 'reservations', label: 'Reservations', icon: Calendar },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'profile', label: 'Shop Settings', icon: Settings },
+  ] as const;
+
   return (
-    <header className="sticky top-0 z-40 bg-bg-header backdrop-blur-2xl border-b border-border">
+    <header className="sticky top-0 z-40 bg-white border-b border-[#E5E5E5]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
         {/* Brand & Store Name */}
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-2xl bg-primary/20 border border-primary/40 flex items-center justify-center text-primary shrink-0 shadow-sm">
-            <Store className="w-5 h-5 text-primary" />
-          </div>
-          <div className="min-w-0">
-            <p className="font-serif text-base font-bold text-fg-heading truncate leading-tight">
-              {shopName}
-            </p>
-            <p className="text-[9px] font-mono uppercase tracking-widest text-primary font-bold">
-              MERCHANT CONSOLE • LOCARA
+        <div className="flex items-center gap-3 shrink-0">
+          <Image src="/locara-mark.svg" alt="Locara" width={36} height={36} className="shrink-0" />
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-extrabold text-base text-[#171717]">
+                {shopName || 'Sharma Handicrafts'}
+              </span>
+              <span className="text-[10px] font-bold bg-[#FBF3EE] text-[#A85420] px-1.5 py-0.2 rounded border border-[#F5DECD]">
+                Merchant
+              </span>
+            </div>
+            <p className="text-[11px] text-[#8A8A8A]">
+              Locara Merchant Portal
             </p>
           </div>
         </div>
 
-        {/* Desktop Nav Tabs */}
-        <nav className="hidden md:flex items-center gap-1 bg-bg-card p-1 rounded-2xl border border-border">
-          {(
-            [
-              { id: 'showcase', label: 'Dashboard' },
-              { id: 'reservations', label: 'Reservations' },
-              { id: 'addproduct', label: 'Products' },
-              { id: 'collections', label: 'Collections' },
-              { id: 'analytics', label: 'Analytics' },
-              { id: 'profile', label: 'Profile' },
-            ] as const
-          ).map((tab) => {
+        {/* Desktop Nav Items */}
+        <nav className="hidden md:flex items-center gap-1 bg-[#F5F4F0] p-1 rounded-lg border border-[#E5E5E5]">
+          {NAV_ITEMS.map((tab) => {
+            const Icon = tab.icon;
             const isActive = ownerPage === tab.id;
             return (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => ownerNavTo(tab.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
                   isActive
-                    ? 'bg-primary text-white shadow-sm'
-                    : 'text-fg-secondary hover:text-fg hover:bg-bg-pill'
+                    ? 'bg-white text-[#A85420] shadow-sm'
+                    : 'text-[#666666] hover:text-[#171717]'
                 }`}
               >
-                {tab.label}
+                <Icon className="w-3.5 h-3.5" />
+                <span>{tab.label}</span>
               </button>
             );
           })}
         </nav>
 
-        {/* Actions */}
+        {/* Action Buttons */}
         <div className="flex items-center gap-2.5 shrink-0">
-          <ThemeToggle />
-
           <button
             type="button"
             onClick={() => {
               navTo('home');
-              router.push('/explorer');
+              router.push('/');
             }}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-bg-card hover:bg-bg-cardHover border border-border text-xs font-bold text-fg-secondary hover:text-fg transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-[#F5F4F0] border border-[#E5E5E5] text-xs font-semibold text-[#171717] transition-colors"
           >
-            <Compass className="w-3.5 h-3.5 text-primary" />
-            <span className="hidden lg:inline">Explorer View</span>
+            <Compass className="w-3.5 h-3.5 text-[#A85420]" />
+            <span className="hidden sm:inline">Customer View</span>
           </button>
 
           <button
             type="button"
             onClick={() => {
               logout();
-              router.push('/');
+              router.push('/auth');
             }}
             title="Sign Out"
-            className="px-3 py-2 rounded-xl bg-bg-card hover:bg-bg-cardHover border border-border text-xs font-bold text-rose-500 transition-all cursor-pointer flex items-center gap-1.5"
+            className="p-2 text-[#8A8A8A] hover:text-[#DC2626] rounded-lg transition-colors"
           >
-            <LogOut className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Logout</span>
+            <LogOut className="w-4 h-4" />
           </button>
         </div>
       </div>

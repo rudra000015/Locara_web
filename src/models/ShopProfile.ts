@@ -5,6 +5,7 @@ export interface IShopProfile extends Document {
   ownerId: mongoose.Types.ObjectId;
   ownerName?: string;
   ownerEmail?: string;
+  contactEmail?: string;
   ownerImg?: string;
 
   name: string;
@@ -17,6 +18,18 @@ export interface IShopProfile extends Document {
   website?: string;
 
   category?: string;
+  subcategory?: string;
+  businessType?: string;
+  priceRange?: string;
+  yearsInBusiness?: number;
+  targetAudience?: string;
+  productsServices?: string;
+  area?: string;
+  pincode?: string;
+  shopStyle?: string;
+  aiGeneratedDescription?: string;
+  keywords?: string[];
+  status?: "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED";
   tags?: string[];
   specialties?: string[];
   tagline?: string;
@@ -57,6 +70,7 @@ const ShopProfileSchema = new Schema<IShopProfile>(
     ownerId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     ownerName: { type: String, trim: true },
     ownerEmail: { type: String, trim: true, lowercase: true },
+    contactEmail: { type: String, trim: true, lowercase: true },
     ownerImg: { type: String, trim: true },
 
     name: { type: String, required: true, trim: true },
@@ -69,6 +83,18 @@ const ShopProfileSchema = new Schema<IShopProfile>(
     website: { type: String, trim: true },
 
     category: { type: String, trim: true, default: "general", index: true },
+    subcategory: { type: String, trim: true, index: true },
+    businessType: { type: String, trim: true },
+    priceRange: { type: String, trim: true },
+    yearsInBusiness: { type: Number, min: 0, max: 300 },
+    targetAudience: { type: String, trim: true },
+    productsServices: { type: String, trim: true },
+    area: { type: String, trim: true, index: true },
+    pincode: { type: String, trim: true },
+    shopStyle: { type: String, trim: true },
+    aiGeneratedDescription: { type: String, trim: true },
+    keywords: [{ type: String, trim: true, lowercase: true }],
+    status: { type: String, enum: ["PENDING", "APPROVED", "REJECTED", "SUSPENDED"], default: "PENDING", index: true },
     tags: [{ type: String, trim: true }],
     specialties: [{ type: String, trim: true }],
     tagline: { type: String, trim: true },

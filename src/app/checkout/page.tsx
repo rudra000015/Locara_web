@@ -40,8 +40,18 @@ export default function CheckoutPage() {
 
   const [paymentMethod, setPaymentMethod] = useState<'RAZORPAY_MODAL' | 'UPI_QR' | 'CARDS' | 'NETBANKING'>('RAZORPAY_MODAL');
   const [loading, setLoading] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successReservation, setSuccessReservation] = useState<any | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      router.replace(`/auth?role=explorer&next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      return;
+    }
+    setAuthReady(true);
+  }, [router]);
 
   const handlePayWithRazorpay = async () => {
     setLoading(true);
@@ -108,6 +118,19 @@ export default function CheckoutPage() {
       setLoading(false);
     }
   };
+
+  if (!authReady) {
+    return (
+      <div className="min-h-screen bg-[#0E0B08] flex items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto h-10 w-10 rounded-full border-2 border-[#C8893F] border-t-transparent animate-spin" />
+          <p className="mt-4 text-xs font-mono uppercase tracking-[0.2em] text-[#9E8B75]">
+            Securing checkout...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (successReservation) {
     return (

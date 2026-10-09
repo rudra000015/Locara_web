@@ -75,7 +75,7 @@ interface ToastState {
   visible: boolean;
 }
 
-export type OwnerPage = 'showcase' | 'collections' | 'addproduct' | 'profile' | 'analytics' | 'reservations';
+export type OwnerPage = 'showcase' | 'products' | 'collections' | 'addproduct' | 'profile' | 'analytics' | 'reservations' | 'offers';
 
 export interface OwnerShopProfile {
   tagline: string;
@@ -109,6 +109,18 @@ interface AppStore {
   setLanguage: (l: LanguageMode) => void;
   theme: ThemeMode;
   setTheme: (t: ThemeMode) => void;
+
+  // Location State
+  userLocation: {
+    latitude: number | null;
+    longitude: number | null;
+    permission: 'granted' | 'denied' | 'prompt';
+  };
+  setUserLocation: (coords: { latitude: number; longitude: number }) => void;
+  setLocationPermission: (permission: 'granted' | 'denied' | 'prompt') => void;
+  requestUserLocation: () => Promise<{ latitude: number; longitude: number } | null>;
+  selectedCity: string;
+  setSelectedCity: (city: string) => void;
 
   // Explorer navigation
   currentPage: string;
@@ -151,6 +163,7 @@ interface AppStore {
 
   // Reservations
   reservations: ReservationPass[];
+  setReservations: (reservations: ReservationPass[]) => void;
   createReservation: (data: {
     productId: string;
     productName: string;
@@ -206,44 +219,44 @@ interface AppStore {
 const DEFAULT_RESERVATIONS: ReservationPass[] = [
   {
     id: 'res_seed_1',
-    otp: 'LOC-894210',
-    productId: 'maya-drop-1',
-    productName: 'Raw Mango Mulberry Silk Saree',
-    productImage: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=800&auto=format&fit=crop',
-    price: 18500,
-    advancePaid: 1850,
-    balanceDue: 16650,
-    shopId: 'maya-studio',
-    shopName: 'Maya Studio & Atelier',
-    shopAddress: '428 100ft Road, Indiranagar, Bangalore',
-    shopPhone: '+91 80 4123 9988',
-    shopLocation: [12.9716, 77.6412],
-    customerName: 'Rohan Mehta',
-    customerPhone: '+91 98450 99881',
-    pickupDate: 'Tomorrow (Wed, 3 PM - 6 PM)',
-    timeSlot: '3:00 PM - 6:00 PM',
+    otp: 'LOC-482913',
+    productId: 'prod_lamp_1',
+    productName: 'Decorative Lamp',
+    productImage: 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=800&q=80',
+    price: 2699,
+    advancePaid: 269.9,
+    balanceDue: 2429.1,
+    shopId: 'sharma-handicrafts',
+    shopName: 'Sharma Handicrafts',
+    shopAddress: '42 Sadar Bazaar, Cantt Road, Meerut',
+    shopPhone: '+91 98370 12345',
+    shopLocation: [28.9845, 77.7064],
+    customerName: 'Rahul Sharma',
+    customerPhone: '+91 98370 55555',
+    pickupDate: '12 Oct 2026',
+    timeSlot: '5:00 PM – 6:00 PM',
     status: 'CONFIRMED',
     createdAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
   },
   {
     id: 'res_seed_2',
-    otp: 'LOC-492100',
-    productId: 'brahmin-pass-1',
-    productName: "Brahmin's Coffee Bar 1932 Filter Coffee Pass",
-    productImage: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?q=80&w=800&auto=format&fit=crop',
-    price: 250,
-    advancePaid: 0,
-    balanceDue: 250,
-    shopId: 'brahmins-coffee',
-    shopName: "Brahmin's Coffee Bar",
-    shopAddress: 'Ranga Rao Road, Near Shankar Matt, Shankarpuram, Bangalore',
-    shopPhone: '+91 80 2667 9999',
-    shopLocation: [12.9463, 77.5684],
-    customerName: 'Rohan Mehta',
-    customerPhone: '+91 98450 99881',
-    pickupDate: 'Today (Anytime before 7 PM)',
-    timeSlot: 'Morning / Evening Slot',
+    otp: 'LOC-291048',
+    productId: 'prod_cotton_kurta',
+    productName: 'Cotton Kurta',
+    productImage: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=800&q=80',
+    price: 899,
+    advancePaid: 89.9,
+    balanceDue: 809.1,
+    shopId: 'style-hub',
+    shopName: 'Style Hub',
+    shopAddress: '18 Abu Lane, Central Market, Meerut',
+    shopPhone: '+91 98370 98765',
+    shopLocation: [28.9812, 77.7021],
+    customerName: 'Priya Verma',
+    customerPhone: '+91 98370 44444',
+    pickupDate: 'Tomorrow (Anytime before 7 PM)',
+    timeSlot: '4:00 PM - 5:00 PM',
     status: 'CONFIRMED',
     createdAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
@@ -271,11 +284,84 @@ export const useStore = create<AppStore>((set, get) => ({
   theme: 'light',
   setTheme: (theme) => set({ theme }),
 
+  // ── Location State ─────────────────────────────────────
+  selectedCity: 'Meerut',
+  setSelectedCity: (selectedCity) => set({ selectedCity }),
+  userLocation: {
+    latitude: null,
+    longitude: null,
+    permission: 'prompt',
+  },
+  setUserLocation: (coords) =>
+    set({
+      userLocation: {
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        permission: 'granted',
+      },
+    }),
+  setLocationPermission: (permission) =>
+    set((s) => ({
+      userLocation: {
+        ...s.userLocation,
+        permission,
+      },
+    })),
+  requestUserLocation: async () => {
+    const { showToast } = get();
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      set({
+        userLocation: { latitude: null, longitude: null, permission: 'denied' },
+      });
+      showToast('Geolocation is not supported by your browser');
+      return null;
+    }
+
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const coords = {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          };
+          set({
+            userLocation: {
+              latitude: coords.latitude,
+              longitude: coords.longitude,
+              permission: 'granted',
+            },
+          });
+          showToast('Location enabled! Showing nearby shops');
+          resolve(coords);
+        },
+        (err) => {
+          set((s) => ({
+            userLocation: {
+              ...s.userLocation,
+              permission: 'denied',
+            },
+          }));
+          if (err.code === err.PERMISSION_DENIED) {
+            showToast('Location access was denied. Showing default city shops.');
+          } else {
+            showToast('Could not fetch location. Showing default city shops.');
+          }
+          resolve(null);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 60000,
+        }
+      );
+    });
+  },
+
   // ── Navigator ─────────────────────────────────────────
   currentPage: 'home',
-  currentShopId: 'maya-studio',
-  currentProdId: 'maya-drop-1',
-  currentMarketSlug: 'indiranagar-100ft',
+  currentShopId: 'sharma-handicrafts',
+  currentProdId: 'prod_lamp_1',
+  currentMarketSlug: 'sadar-bazaar',
   navTo: (page) => set({ currentPage: page }),
   openShop: (shopId) => set({ currentShopId: shopId, currentPage: 'shop' }),
   viewProduct: (shopId, prodId) =>
@@ -432,6 +518,7 @@ export const useStore = create<AppStore>((set, get) => ({
 
   // ── Reservations (Offline Drop Passes) ─────────────────
   reservations: DEFAULT_RESERVATIONS,
+  setReservations: (reservations) => set({ reservations }),
   createReservation: (data) => {
     const { reservations, user, showToast } = get();
     const random6 = Math.floor(100000 + Math.random() * 900000);
@@ -535,8 +622,8 @@ export const useStore = create<AppStore>((set, get) => ({
   },
 
   // ── Owner ──────────────────────────────────────────────
-  ownerShopId: 'maya-studio',
-  ownerShopName: 'Maya Studio & Atelier',
+  ownerShopId: 'sharma-handicrafts',
+  ownerShopName: 'Sharma Handicrafts',
   ownerPage: 'showcase',
   ownerNavTo: (page) => set({ ownerPage: page }),
   setOwnerShopId: (ownerShopId) => set({ ownerShopId }),

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDb } from "@/lib/mongodb";
 import { Collection } from "@/models/Collection";
+import { ShopProfile } from "@/models/ShopProfile";
 import { extractBearerToken, verifyAuthToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -81,17 +82,34 @@ const SEED_COLLECTIONS = [
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const shopId = searchParams.get("shopId");
     const tag = searchParams.get("tag");
+    const token = extractBearerToken(req);
+    const auth = token ? verifyAuthToken(token) : null;
+    const ownerView = auth?.role === "owner";
 
     try {
       await connectDb();
       const filter: Record<string, any> = { status: "ACTIVE" };
-      if (shopId) filter.shopId = shopId;
+      if (ownerView) {
+        const ownerShop = await ShopProfile.findOne({ ownerId: auth!.id }).sort({ updatedAt: -1 }).lean();
+        if (!ownerShop) return NextResponse.json({ collections: [], total: 0 });
+        filter.shopId = ownerShop.shopId;
+      } else {
+        const requestedShopId = searchParams.get("shopId");
+        if (requestedShopId) {
+          // Explorer routes may use the Mongo document id while owner content
+          // is stored against the public shop slug.
+          const shop = await ShopProfile.findOne({ shopId: requestedShopId }).select({ shopId: 1 }).lean()
+            ?? (/^[a-f\d]{24}$/i.test(requestedShopId)
+              ? await ShopProfile.findById(requestedShopId).select({ shopId: 1 }).lean()
+              : null);
+          filter.shopId = shop?.shopId ?? requestedShopId;
+        }
+      }
       if (tag) filter.tag = tag;
 
       const collections = await Collection.find(filter).sort({ createdAt: -1 }).lean();
-      if (collections.length > 0) {
+      if (ownerView || collections.length > 0) {
         return NextResponse.json({
           collections: collections.map((c) => ({ ...c, id: c._id.toString() })),
           total: collections.length,
@@ -99,6 +117,8 @@ export async function GET(req: NextRequest) {
       }
     } catch {}
 
+    if (ownerView) return NextResponse.json({ collections: [], total: 0 });
+    const shopId = searchParams.get("shopId");
     let filtered = SEED_COLLECTIONS;
     if (shopId) filtered = filtered.filter((c) => c.shopId === shopId);
     if (tag) filtered = filtered.filter((c) => c.tag.toLowerCase() === tag.toLowerCase());
@@ -124,13 +144,15 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { title, description, coverImage, tag, products = [], shopId, shopName } = body;
+    const { title, description, coverImage, tag, products = [] } = body;
 
     if (!title || !coverImage) {
       return NextResponse.json({ error: "Collection title and cover image are required" }, { status: 400 });
     }
 
     await connectDb();
+    const ownedShop = await ShopProfile.findOne({ ownerId: auth.id }).sort({ updatedAt: -1 }).lean();
+    if (!ownedShop) return NextResponse.json({ error: "Register your shop before creating a collection" }, { status: 404 });
     const slug = title
       .toLowerCase()
       .trim()
@@ -138,8 +160,8 @@ export async function POST(req: NextRequest) {
       .replace(/\s+/g, "-");
 
     const created = await Collection.create({
-      shopId: shopId || `shop_${auth.id}`,
-      shopName: shopName || "Heritage Store",
+      shopId: ownedShop.shopId,
+      shopName: ownedShop.name,
       title: title.trim(),
       slug: `${slug}-${Date.now().toString().slice(-4)}`,
       description: description ? description.trim() : "",

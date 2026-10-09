@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDb } from "@/lib/mongodb";
 import { Reservation } from "@/models/Reservation";
+import { ShopProfile } from "@/models/ShopProfile";
 import { extractBearerToken, verifyAuthToken } from "@/lib/auth";
 
 export async function GET(
@@ -8,11 +9,17 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const token = extractBearerToken(req);
+    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = verifyAuthToken(token);
     await connectDb();
     const id = params.id;
+    const scope = auth.role === "owner"
+      ? { shopId: (await ShopProfile.findOne({ ownerId: auth.id }).lean())?.shopId ?? "__no-shop__" }
+      : { userId: auth.id };
 
     const reservation = await Reservation.findOne({
-      $or: [{ _id: id }, { reservationNumber: id }],
+      $and: [{ $or: [{ _id: id }, { reservationNumber: id }] }, scope],
     }).lean();
 
     if (!reservation) {
@@ -46,7 +53,12 @@ export async function PATCH(
     await connectDb();
 
     const reservation = await Reservation.findOne({
-      $or: [{ _id: params.id }, { reservationNumber: params.id }],
+      $and: [
+        { $or: [{ _id: params.id }, { reservationNumber: params.id }] },
+        auth.role === "owner"
+          ? { shopId: (await ShopProfile.findOne({ ownerId: auth.id }).lean())?.shopId ?? "__no-shop__" }
+          : { userId: auth.id },
+      ],
     });
 
     if (!reservation) {

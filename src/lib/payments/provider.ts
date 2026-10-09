@@ -7,69 +7,51 @@ import {
   PaymentVerificationResult,
 } from './types';
 
-const PAYMENT_SECRET =
-  process.env.RAZORPAY_KEY_SECRET || process.env.PAYMENT_SECRET || 'F8lh6eMB2Ii6utQ9xs3LJuER';
+const PAYMENT_SECRET = process.env.RAZORPAY_KEY_SECRET || process.env.PAYMENT_SECRET;
 const PAYMENT_KEY_ID =
-  process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.PAYMENT_KEY_ID || 'rzp_test_TZ3I1fWFO04GSs';
+  process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.PAYMENT_KEY_ID;
 
 export class LocaraPaymentGateway implements IPaymentProvider {
   async createPaymentOrder(params: PaymentOrderParams): Promise<PaymentOrderResult> {
     const keyId = process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || PAYMENT_KEY_ID;
     const keySecret = process.env.RAZORPAY_KEY_SECRET || PAYMENT_SECRET;
 
-    // Call live Razorpay Orders API if configured
-    if (keyId && keySecret && keyId.startsWith('rzp_')) {
-      try {
-        const authHeader = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
-        const rzpRes = await fetch('https://api.razorpay.com/v1/orders', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Basic ${authHeader}`,
-          },
-          body: JSON.stringify({
-            amount: Math.round(params.amount * 100), // amount in paise
-            currency: params.currency || 'INR',
-            receipt: `rcpt_${Date.now().toString().slice(-10)}`,
-            notes: {
-              reservationId: params.reservationId,
-              shopId: params.shop?.id,
-              shopName: params.shop?.name,
-            },
-          }),
-        });
-
-        if (rzpRes.ok) {
-          const rzpData = await rzpRes.json();
-          return {
-            orderId: rzpData.id,
-            amount: params.amount,
-            currency: rzpData.currency || 'INR',
-            keyId,
-            sessionToken: rzpData.id,
-            supportedMethods: ['UPI', 'CARD', 'NETBANKING', 'WALLET'],
-          };
-        } else {
-          console.warn('[Razorpay Orders API]', rzpRes.status, await rzpRes.text());
-        }
-      } catch (err) {
-        console.warn('[Razorpay] Order API fallback to local token:', err);
-      }
+    if (!keyId || !keySecret || !keyId.startsWith('rzp_')) {
+      throw new Error('Razorpay credentials are not configured');
     }
 
-    // Local fallback order token
-    const rawTokenPayload = `${params.orderId}:${params.reservationId}:${params.amount}:${Date.now()}`;
-    const sessionToken = crypto
-      .createHmac('sha256', keySecret)
-      .update(rawTokenPayload)
-      .digest('hex');
+    const authHeader = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
+    const rzpRes = await fetch('https://api.razorpay.com/v1/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Basic ${authHeader}`,
+      },
+      body: JSON.stringify({
+        amount: Math.round(params.amount * 100),
+        currency: params.currency || 'INR',
+        receipt: `rcpt_${Date.now().toString().slice(-10)}`,
+        notes: {
+          reservationId: params.reservationId,
+          shopId: params.shop?.id,
+          shopName: params.shop?.name,
+        },
+      }),
+    });
+
+    if (!rzpRes.ok) {
+      const errorText = await rzpRes.text();
+      throw new Error(`Razorpay order creation failed: ${errorText}`);
+    }
+
+    const rzpData = await rzpRes.json();
 
     return {
-      orderId: params.orderId,
+      orderId: rzpData.id,
       amount: params.amount,
-      currency: params.currency || 'INR',
+      currency: rzpData.currency || 'INR',
       keyId,
-      sessionToken,
+      sessionToken: rzpData.id,
       supportedMethods: ['UPI', 'CARD', 'NETBANKING', 'WALLET'],
     };
   }
@@ -86,18 +68,22 @@ export class LocaraPaymentGateway implements IPaymentProvider {
     }
 
     const keySecret = process.env.RAZORPAY_KEY_SECRET || PAYMENT_SECRET;
+    if (!keySecret) {
+      return {
+        success: false,
+        transactionId: params.paymentId,
+        amountPaid: 0,
+        verifiedAt: new Date().toISOString(),
+        error: 'Razorpay secret is not configured',
+      };
+    }
+
     const expectedSignature = crypto
       .createHmac('sha256', keySecret)
       .update(`${params.orderId}|${params.paymentId}`)
       .digest('hex');
 
-    // Cryptographic signature check or test fallback
-    const isValid =
-      params.signature === expectedSignature ||
-      params.signature.startsWith('sig_test_') ||
-      params.signature.length >= 20;
-
-    if (!isValid) {
+    if (params.signature !== expectedSignature) {
       return {
         success: false,
         transactionId: params.paymentId,
@@ -124,4 +110,3 @@ export class LocaraPaymentGateway implements IPaymentProvider {
 }
 
 export const paymentProvider = new LocaraPaymentGateway();
-

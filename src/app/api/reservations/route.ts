@@ -38,22 +38,14 @@ export async function GET(req: NextRequest) {
     await connectDb();
 
     const { searchParams } = new URL(req.url);
-    const shopId = searchParams.get("shopId");
     const status = searchParams.get("status");
 
     const query: Record<string, any> = {};
 
     if (payload.role === "owner") {
-      if (shopId) {
-        query.shopId = shopId;
-      } else {
-        const ownerShop = await ShopProfile.findOne({ ownerId: payload.id }).lean();
-        if (ownerShop) {
-          query.shopId = ownerShop.shopId;
-        } else {
-          return NextResponse.json({ reservations: [] });
-        }
-      }
+      const ownerShop = await ShopProfile.findOne({ ownerId: payload.id }).lean();
+      if (!ownerShop) return NextResponse.json({ reservations: [] });
+      query.shopId = ownerShop.shopId;
     } else {
       query.userId = payload.id;
     }
@@ -83,12 +75,16 @@ export async function POST(req: NextRequest) {
     let userName = "Locara Explorer";
     let userEmail = "";
 
-    if (token) {
-      try {
-        const auth = verifyAuthToken(token);
-        userId = auth.id;
-        userEmail = auth.email;
-      } catch {}
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    try {
+      const auth = verifyAuthToken(token);
+      userId = auth.id;
+      userEmail = auth.email;
+    } catch {
+      return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
 
     const body = await req.json();

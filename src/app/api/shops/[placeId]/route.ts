@@ -28,10 +28,10 @@ export async function GET(
   try {
     await connectDb();
 
-    let dbDoc = await ShopProfile.findOne({ shopId: placeId }).lean();
+    let dbDoc = await ShopProfile.findOne({ shopId: placeId, status: 'APPROVED' }).lean();
 
     if (!dbDoc && mongoose.isValidObjectId(placeId)) {
-      dbDoc = await ShopProfile.findById(placeId).lean();
+      dbDoc = await ShopProfile.findOne({ _id: placeId, status: 'APPROVED' }).lean();
     }
 
     if (dbDoc) {

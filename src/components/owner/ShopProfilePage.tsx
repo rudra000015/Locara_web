@@ -1,15 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '@/store/useStore';
 import AutoFillModal from './AutoFillModal';
 import {
   BadgeCheck,
   Sparkles,
-  Camera,
-  Upload,
   Save,
-  CheckCircle2,
   Clock,
   Phone,
   Mail,
@@ -17,7 +14,6 @@ import {
   Plus,
   X,
 } from 'lucide-react';
-import PremiumButton from '@/components/ui/PremiumButton';
 
 async function ownerFetch(path: string, init?: RequestInit) {
   const token = localStorage.getItem('auth_token');
@@ -37,14 +33,14 @@ async function ownerFetch(path: string, init?: RequestInit) {
 }
 
 const SPECIALTY_SUGGESTIONS = [
-  'Generational Recipes',
+  'Handmade Crafts',
   'Pure Desi Ghee',
-  'Artisanal Handcraft',
+  'Custom Tailoring',
   'Certified Heritage',
-  'Festive Bundles',
-  'No Preservatives',
-  'Master Tailoring',
-  'Heirloom Spices',
+  'Festive Gifts',
+  'Authentic Brassware',
+  'Natural Fabrics',
+  'Organic Sweets',
 ];
 
 export default function ShopProfilePage() {
@@ -56,9 +52,6 @@ export default function ShopProfilePage() {
     showToast,
   } = useStore();
   const profile = shopProfiles[ownerShopId];
-
-  const coverInputRef = useRef<HTMLInputElement>(null);
-  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const [newSpecialty, setNewSpecialty] = useState('');
   const [saving, setSaving] = useState(false);
@@ -100,14 +93,15 @@ export default function ShopProfilePage() {
     setSaving(true);
     try {
       await ownerFetch('/api/owner/shop', {
-        method: 'PUT',
+        method: 'PATCH',
         body: JSON.stringify(form),
       });
 
       updateShopProfile(ownerShopId, form);
       showToast('Shop profile saved successfully!');
     } catch (err: any) {
-      showToast(err?.message || 'Failed to save shop profile');
+      updateShopProfile(ownerShopId, form);
+      showToast('Shop profile updated locally');
     } finally {
       setSaving(false);
     }
@@ -126,47 +120,47 @@ export default function ShopProfilePage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-12">
       {/* Header */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-[#121212] border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+      <div className="p-6 rounded-2xl bg-white border border-[#E5E5E5] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <BadgeCheck className="w-4 h-4 text-[#C9A96E]" />
-            <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#C9A96E]">
-              HERITAGE IDENTITY
+          <div className="flex items-center gap-1.5 mb-1 text-[#A85420]">
+            <BadgeCheck className="w-4 h-4" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">
+              STORE PROFILE
             </span>
           </div>
-          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#F5F5F5]">
-            Shop Profile & Story
+          <h2 className="text-2xl font-bold text-[#171717]">
+            Shop Information & Details
           </h2>
-          <p className="text-xs text-[#71717A] mt-1">
-            Customize how your store appears to explorers and cultural tourists across India.
+          <p className="text-xs text-[#666666] mt-0.5">
+            Configure how your shop profile appears to local buyers on Locara.
           </p>
         </div>
 
         <button
           type="button"
           onClick={() => setShowAutoFill(true)}
-          className="px-4 py-2.5 rounded-xl bg-[#1C1C1C] hover:bg-[#242424] border border-[#C9A96E]/30 text-xs font-bold text-[#C9A96E] flex items-center gap-2 transition-all cursor-pointer shrink-0"
+          className="px-4 py-2.5 rounded-lg bg-[#FAFAF8] hover:bg-[#F5F4F0] border border-[#E5E5E5] text-xs font-bold text-[#A85420] flex items-center gap-2 transition-all cursor-pointer shrink-0"
         >
-          <Sparkles className="w-4 h-4" /> AI Heritage Assistant
+          <Sparkles className="w-4 h-4" /> AI Auto-Fill Helper
         </button>
       </div>
 
       {/* Main Settings Form */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-[#121212] border border-white/10 space-y-6 shadow-xl">
+      <div className="p-6 rounded-2xl bg-white border border-[#E5E5E5] space-y-5 shadow-sm">
         {/* Cover Photo */}
         <div>
-          <label className="block text-[10px] font-mono uppercase text-[#71717A] mb-2 font-bold">
-            Cover Banner URL
+          <label className="block text-xs font-bold text-[#171717] mb-1.5">
+            Shop Cover Image URL
           </label>
           <input
             type="text"
             value={form.coverImage}
             onChange={(e) => setForm({ ...form, coverImage: e.target.value })}
             placeholder="https://images.unsplash.com/..."
-            className="w-full px-4 py-3 rounded-xl bg-[#181818] border border-white/10 text-xs text-[#F5F5F5] placeholder-[#52525B] outline-none focus:border-[#C9A96E] transition-colors mb-2"
+            className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAFAF8] border border-[#E5E5E5] text-xs text-[#171717] placeholder-[#8A8A8A] outline-none focus:border-[#A85420] transition-colors mb-2"
           />
           {form.coverImage && (
-            <div className="h-40 rounded-2xl overflow-hidden bg-[#181818] border border-white/10">
+            <div className="h-36 rounded-xl overflow-hidden bg-[#FAFAF8] border border-[#E5E5E5]">
               <img src={form.coverImage} alt="Cover Preview" className="w-full h-full object-cover" />
             </div>
           )}
@@ -174,70 +168,70 @@ export default function ShopProfilePage() {
 
         {/* Tagline */}
         <div>
-          <label className="block text-[10px] font-mono uppercase text-[#71717A] mb-1.5 font-bold">
-            Tagline / Motto
+          <label className="block text-xs font-bold text-[#171717] mb-1.5">
+            Shop Tagline / Slogan
           </label>
           <input
             type="text"
             value={form.tagline}
             onChange={(e) => setForm({ ...form, tagline: e.target.value })}
-            placeholder="e.g. Master Confectioners Since 1952"
-            className="w-full px-4 py-3 rounded-xl bg-[#181818] border border-white/10 text-xs text-[#F5F5F5] placeholder-[#52525B] outline-none focus:border-[#C9A96E] transition-colors"
+            placeholder="e.g. Master Artisans Since 1952"
+            className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAFAF8] border border-[#E5E5E5] text-xs text-[#171717] placeholder-[#8A8A8A] outline-none focus:border-[#A85420] transition-colors"
           />
         </div>
 
         {/* Story Description */}
         <div>
-          <label className="block text-[10px] font-mono uppercase text-[#71717A] mb-1.5 font-bold">
-            Generational Heritage Story
+          <label className="block text-xs font-bold text-[#171717] mb-1.5">
+            About the Shop
           </label>
           <textarea
             rows={4}
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
-            placeholder="Detail your shop's founding history, ancestors, traditional processes, and legacy in the city..."
-            className="w-full px-4 py-3 rounded-xl bg-[#181818] border border-white/10 text-xs text-[#F5F5F5] placeholder-[#52525B] outline-none focus:border-[#C9A96E] transition-colors resize-none leading-relaxed"
+            placeholder="Describe your shop history, specialties, artisan background, and location landmarks..."
+            className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAFAF8] border border-[#E5E5E5] text-xs text-[#171717] placeholder-[#8A8A8A] outline-none focus:border-[#A85420] transition-colors resize-none leading-relaxed"
           />
         </div>
 
-        {/* Contact Info (Phone, Email, Website) */}
+        {/* Contact Info */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-[10px] font-mono uppercase text-[#71717A] mb-1.5 font-bold flex items-center gap-1">
-              <Phone className="w-3 h-3 text-[#C9A96E]" /> Phone
+            <label className="block text-xs font-bold text-[#171717] mb-1.5 flex items-center gap-1">
+              <Phone className="w-3.5 h-3.5 text-[#A85420]" /> Phone
             </label>
             <input
               type="text"
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
               placeholder="+91 98765 43210"
-              className="w-full px-4 py-2.5 rounded-xl bg-[#181818] border border-white/10 text-xs text-[#F5F5F5] placeholder-[#52525B] outline-none focus:border-[#C9A96E]"
+              className="w-full px-3.5 py-2 rounded-lg bg-[#FAFAF8] border border-[#E5E5E5] text-xs text-[#171717] placeholder-[#8A8A8A] outline-none focus:border-[#A85420]"
             />
           </div>
 
           <div>
-            <label className="block text-[10px] font-mono uppercase text-[#71717A] mb-1.5 font-bold flex items-center gap-1">
-              <Mail className="w-3 h-3 text-[#C9A96E]" /> Email
+            <label className="block text-xs font-bold text-[#171717] mb-1.5 flex items-center gap-1">
+              <Mail className="w-3.5 h-3.5 text-[#A85420]" /> Email
             </label>
             <input
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              placeholder="owner@heritage.in"
-              className="w-full px-4 py-2.5 rounded-xl bg-[#181818] border border-white/10 text-xs text-[#F5F5F5] placeholder-[#52525B] outline-none focus:border-[#C9A96E]"
+              placeholder="shop@example.com"
+              className="w-full px-3.5 py-2 rounded-lg bg-[#FAFAF8] border border-[#E5E5E5] text-xs text-[#171717] placeholder-[#8A8A8A] outline-none focus:border-[#A85420]"
             />
           </div>
 
           <div>
-            <label className="block text-[10px] font-mono uppercase text-[#71717A] mb-1.5 font-bold flex items-center gap-1">
-              <Globe className="w-3 h-3 text-[#C9A96E]" /> Website
+            <label className="block text-xs font-bold text-[#171717] mb-1.5 flex items-center gap-1">
+              <Globe className="w-3.5 h-3.5 text-[#A85420]" /> Website
             </label>
             <input
               type="text"
               value={form.website}
               onChange={(e) => setForm({ ...form, website: e.target.value })}
               placeholder="https://..."
-              className="w-full px-4 py-2.5 rounded-xl bg-[#181818] border border-white/10 text-xs text-[#F5F5F5] placeholder-[#52525B] outline-none focus:border-[#C9A96E]"
+              className="w-full px-3.5 py-2 rounded-lg bg-[#FAFAF8] border border-[#E5E5E5] text-xs text-[#171717] placeholder-[#8A8A8A] outline-none focus:border-[#A85420]"
             />
           </div>
         </div>
@@ -245,49 +239,49 @@ export default function ShopProfilePage() {
         {/* Operating Hours */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-[10px] font-mono uppercase text-[#71717A] mb-1.5 font-bold flex items-center gap-1">
-              <Clock className="w-3 h-3 text-[#C9A96E]" /> Opening Time
+            <label className="block text-xs font-bold text-[#171717] mb-1.5 flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5 text-[#A85420]" /> Opening Time
             </label>
             <input
               type="time"
               value={form.openTime}
               onChange={(e) => setForm({ ...form, openTime: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl bg-[#181818] border border-white/10 text-xs font-mono text-[#F5F5F5] outline-none focus:border-[#C9A96E]"
+              className="w-full px-3.5 py-2 rounded-lg bg-[#FAFAF8] border border-[#E5E5E5] text-xs text-[#171717] outline-none focus:border-[#A85420]"
             />
           </div>
 
           <div>
-            <label className="block text-[10px] font-mono uppercase text-[#71717A] mb-1.5 font-bold flex items-center gap-1">
-              <Clock className="w-3 h-3 text-[#C9A96E]" /> Closing Time
+            <label className="block text-xs font-bold text-[#171717] mb-1.5 flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5 text-[#A85420]" /> Closing Time
             </label>
             <input
               type="time"
               value={form.closeTime}
               onChange={(e) => setForm({ ...form, closeTime: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl bg-[#181818] border border-white/10 text-xs font-mono text-[#F5F5F5] outline-none focus:border-[#C9A96E]"
+              className="w-full px-3.5 py-2 rounded-lg bg-[#FAFAF8] border border-[#E5E5E5] text-xs text-[#171717] outline-none focus:border-[#A85420]"
             />
           </div>
         </div>
 
         {/* Specialties Tags */}
         <div>
-          <label className="block text-[10px] font-mono uppercase text-[#71717A] mb-2 font-bold">
-            Specialties & Heritage Highlights
+          <label className="block text-xs font-bold text-[#171717] mb-2">
+            Store Specialties & Badges
           </label>
 
           <div className="flex flex-wrap gap-1.5 mb-3">
             {form.specialties.map((spec) => (
               <span
                 key={spec}
-                className="px-3 py-1 rounded-full text-xs font-bold bg-[#C9A96E]/15 text-[#C9A96E] border border-[#C9A96E]/30 flex items-center gap-1.5"
+                className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#A85420]/10 text-[#A85420] border border-[#A85420]/20 flex items-center gap-1.5"
               >
                 <span>{spec}</span>
                 <button
                   type="button"
                   onClick={() => removeSpecialty(spec)}
-                  className="hover:text-white"
+                  className="hover:text-[#DC2626]"
                 >
-                  ✕
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </span>
             ))}
@@ -305,12 +299,12 @@ export default function ShopProfilePage() {
                 }
               }}
               placeholder="Add specialty tag..."
-              className="flex-1 px-4 py-2 rounded-xl bg-[#181818] border border-white/10 text-xs text-[#F5F5F5] placeholder-[#52525B] outline-none focus:border-[#C9A96E]"
+              className="flex-1 px-3.5 py-2 rounded-lg bg-[#FAFAF8] border border-[#E5E5E5] text-xs text-[#171717] placeholder-[#8A8A8A] outline-none focus:border-[#A85420]"
             />
             <button
               type="button"
               onClick={() => addSpecialty(newSpecialty)}
-              className="px-4 py-2 rounded-xl bg-[#202020] hover:bg-[#282828] border border-white/10 text-xs font-bold text-[#F5F5F5]"
+              className="px-4 py-2 rounded-lg bg-[#F5F4F0] hover:bg-[#E5E5E5] text-xs font-bold text-[#171717] transition-colors"
             >
               Add
             </button>
@@ -322,7 +316,7 @@ export default function ShopProfilePage() {
                 key={sug}
                 type="button"
                 onClick={() => addSpecialty(sug)}
-                className="px-2.5 py-0.5 rounded-full text-[10px] bg-white/5 hover:bg-white/10 text-[#71717A] hover:text-[#A1A1AA] border border-white/5 transition-colors"
+                className="px-2.5 py-0.5 rounded-md text-[11px] bg-[#FAFAF8] hover:bg-[#F5F4F0] text-[#666666] hover:text-[#171717] border border-[#E5E5E5] transition-colors"
               >
                 + {sug}
               </button>
@@ -331,18 +325,16 @@ export default function ShopProfilePage() {
         </div>
 
         {/* Save Button */}
-        <div className="pt-4 border-t border-white/10">
-          <PremiumButton
-            variant="gold"
-            size="lg"
+        <div className="pt-4 border-t border-[#E5E5E5]">
+          <button
+            type="button"
             onClick={handleSave}
             disabled={saving}
-            icon={Save}
-            className="w-full"
-            magnetic
+            className="w-full py-3 rounded-lg bg-[#A85420] hover:bg-[#873F17] text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm transition-colors cursor-pointer disabled:opacity-50"
           >
-            {saving ? 'Saving Profile...' : 'Save Changes'}
-          </PremiumButton>
+            <Save className="w-4 h-4" />
+            <span>{saving ? 'Saving Profile...' : 'Save Profile Changes'}</span>
+          </button>
         </div>
       </div>
 
@@ -359,7 +351,7 @@ export default function ShopProfilePage() {
               specialties: Array.from(new Set([...f.specialties, ...(data.specialties || [])])),
             }));
             setShowAutoFill(false);
-            showToast('AI suggestions applied!');
+            showToast('Auto-fill suggestions applied!');
           }}
         />
       )}

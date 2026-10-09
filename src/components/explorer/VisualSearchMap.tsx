@@ -5,6 +5,10 @@ import dynamic from 'next/dynamic';
 import { ShopVisualMatchCluster } from '@/services/shopMatchingService';
 import { Store, Sparkles, MapPin, ArrowRight, IndianRupee } from 'lucide-react';
 
+const cartoKeyParam = process.env.NEXT_PUBLIC_CARTO_API_KEY
+  ? `?key=${encodeURIComponent(process.env.NEXT_PUBLIC_CARTO_API_KEY)}`
+  : '';
+
 // Dynamic import of Leaflet components for SSR safety
 const MapContainer = dynamic(
   () => import('react-leaflet').then((m) => m.MapContainer),
@@ -91,8 +95,8 @@ export default function VisualSearchMap({
         ref={mapRef}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          url={`https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png${cartoKeyParam}`}
         />
 
         {/* User Location Marker */}

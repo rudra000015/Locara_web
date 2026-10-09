@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDb } from "@/lib/mongodb";
 import { FootfallEvent, Visit } from "@/models/Visit";
 import { Reservation } from "@/models/Reservation";
+import { ShopProfile } from "@/models/ShopProfile";
 import { extractBearerToken, verifyAuthToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -9,12 +10,11 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const shopId = searchParams.get("shopId");
     const range = searchParams.get("range") || "today"; // "today" | "7days" | "30days"
-
-    if (!shopId) {
-      return NextResponse.json({ error: "Shop ID is required" }, { status: 400 });
-    }
+    const token = extractBearerToken(req);
+    if (!token) return NextResponse.json({ error: "Owner sign-in required" }, { status: 401 });
+    const auth = verifyAuthToken(token);
+    if (auth.role !== "owner") return NextResponse.json({ error: "Only owners can view shop analytics" }, { status: 403 });
 
     let startDate = new Date();
     if (range === "today") {
@@ -26,6 +26,9 @@ export async function GET(req: NextRequest) {
     }
 
     await connectDb();
+    const ownerShop = await ShopProfile.findOne({ ownerId: auth.id }).sort({ updatedAt: -1 }).lean();
+    if (!ownerShop) return NextResponse.json({ error: "No shop is linked to this owner" }, { status: 404 });
+    const shopId = ownerShop.shopId;
 
     // Query events within range
     const events = await FootfallEvent.find({

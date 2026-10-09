@@ -2,31 +2,31 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useStore } from '@/store/useStore';
-import { Compass, MapPin, CalendarCheck, ShoppingBag, User } from 'lucide-react';
+import { Home, Store, MapPin, ShoppingBag, User } from 'lucide-react';
 
 export default function ExplorerNav() {
   const router = useRouter();
   const pathname = usePathname();
-  const { currentPage, navTo, cart, wishlist } = useStore();
+  const { navTo, cart, wishlist } = useStore();
 
   const totalCart = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const TABS = [
-    { id: 'home', icon: Compass, label: 'Discover', href: '/' },
-    { id: 'map', icon: MapPin, label: 'Walking Map', href: '/map' },
-    { id: 'reservations', icon: CalendarCheck, label: 'Passes', href: '/reservations' },
-    { id: 'cart', icon: ShoppingBag, label: 'Drops', href: '/products' },
-    { id: 'profile', icon: User, label: 'Passport', href: '/profile' },
+    { id: 'home', icon: Home, label: 'Home', href: '/' },
+    { id: 'shops', icon: Store, label: 'Shops', href: '/explorer/shops' },
+    { id: 'map', icon: MapPin, label: 'Map', href: '/map' },
+    { id: 'cart', icon: ShoppingBag, label: 'Cart', href: '/explorer/cart' },
+    { id: 'profile', icon: User, label: 'Account', href: '/profile' },
   ];
 
-  const handleTabClick = (tab: typeof TABS[0]) => {
+  const handleTabClick = (tab: (typeof TABS)[0]) => {
     navTo(tab.id as any);
     router.push(tab.href);
   };
 
   return (
-    <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 md:hidden w-[calc(100%-1.5rem)] max-w-md pointer-events-auto">
-      <div className="bg-[#ffffff]/95 backdrop-blur-xl border border-[rgba(72,55,47,0.12)] rounded-full p-1.5 shadow-[0_12px_32px_-4px_rgba(72,55,47,0.15)] flex items-center justify-between">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white border-t border-[#E5E5E5] px-2 py-1 shadow-md">
+      <div className="flex items-center justify-around">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive =
@@ -40,24 +40,22 @@ export default function ExplorerNav() {
               type="button"
               onClick={() => handleTabClick(tab)}
               aria-label={tab.label}
-              className={`relative flex-1 flex flex-col items-center justify-center py-2 rounded-full transition-all duration-200 cursor-pointer ${
-                isActive
-                  ? 'bg-[#48372f] text-[#faf9f4] shadow-sm font-bold'
-                  : 'text-[#6e5a51] hover:text-[#1b1c19]'
+              className={`flex-1 flex flex-col items-center justify-center py-1.5 transition-colors ${
+                isActive ? 'text-[#A85420] font-bold' : 'text-[#666666] hover:text-[#171717]'
               }`}
             >
               <div className="relative">
-                <Icon className={`w-4 h-4 ${isActive ? 'text-[#faf9f4]' : 'text-current'}`} />
+                <Icon className={`w-5 h-5 ${isActive ? 'text-[#A85420]' : 'text-current'}`} />
                 {tab.id === 'cart' && totalCart > 0 && (
-                  <span className="absolute -top-1.5 -right-2.5 min-w-[15px] h-3.5 px-0.5 rounded-full bg-[#ba1a1a] text-white font-black text-[8px] flex items-center justify-center leading-none shadow-sm">
+                  <span className="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-[#A85420] text-white font-bold text-[9px] flex items-center justify-center leading-none">
                     {totalCart}
                   </span>
                 )}
                 {tab.id === 'profile' && wishlist.length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#805e6d]" />
+                  <span className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-[#DC2626]" />
                 )}
               </div>
-              <span className="text-[9px] font-semibold mt-0.5 tracking-tight">{tab.label}</span>
+              <span className="text-[10px] mt-1">{tab.label}</span>
             </button>
           );
         })}

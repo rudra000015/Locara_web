@@ -1,66 +1,55 @@
 'use client';
 
+import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/store/useStore';
-import { useT } from '@/i18n/useT';
+import { Heart, Trash2, ShoppingBag, ChevronRight } from 'lucide-react';
 import { SHOPS } from '@/data/shops';
-import { prodImg } from '@/utils/prodImg';
-import { Heart, Sparkles, Trash2, ArrowRight } from 'lucide-react';
-import PremiumButton from '@/components/ui/PremiumButton';
 
 export default function WishlistPage() {
   const router = useRouter();
-  const { wishlist, toggleWish, viewProduct } = useStore();
-  const t = useT();
+  const { wishlist, toggleWish, viewProduct, addToCart, navTo } = useStore();
 
   if (wishlist.length === 0) {
     return (
-      <div className="max-w-md mx-auto text-center py-28">
-        <div className="w-16 h-16 rounded-2xl bg-[#141414] border border-white/10 flex items-center justify-center text-[#71717A] mx-auto mb-4">
-          <Heart className="w-7 h-7" />
+      <div className="max-w-md mx-auto text-center py-24 px-4">
+        <div className="bg-white border border-[#E5E5E5] rounded-2xl p-10 space-y-4 shadow-sm">
+          <div className="w-16 h-16 rounded-full bg-[#F5F4F0] text-[#8A8A8A] flex items-center justify-center mx-auto">
+            <Heart className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-bold text-[#171717]">Your Wishlist is Empty</h2>
+          <p className="text-xs text-[#666666] max-w-xs mx-auto">
+            Explore local shops and save your favorite handicrafts, jewellery, and fashion pieces here.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              navTo('home');
+              router.push('/');
+            }}
+            className="px-6 py-2.5 bg-[#A85420] hover:bg-[#873F17] text-white text-xs font-bold rounded-lg transition-colors inline-flex items-center gap-1.5"
+          >
+            <span>Start Exploring</span>
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
-        <h3 className="font-serif text-2xl font-bold text-[#F5F5F5] mb-2">
-          {t('wishlist_empty_title')}
-        </h3>
-        <p className="text-xs text-[#71717A] mb-6 leading-relaxed">
-          {t('wishlist_empty_sub')}
-        </p>
-        <PremiumButton
-          variant="gold"
-          size="md"
-          onClick={() => router.push('/explorer')}
-          showArrow
-          magnetic
-        >
-          {t('wishlist_explore')}
-        </PremiumButton>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto pb-12">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/10">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20 space-y-6">
+      <div className="flex items-center justify-between border-b border-[#E5E5E5] pb-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Heart className="w-4 h-4 text-[#ef4444] fill-[#ef4444]" />
-            <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#C9A96E]">
-              SAVED TREASURES
-            </span>
-          </div>
-          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#F5F5F5]">
-            My Heritage Wishlist
-          </h1>
+          <h1 className="text-2xl font-extrabold text-[#171717]">Saved Items & Wishlist</h1>
+          <p className="text-xs text-[#666666] mt-0.5">
+            {wishlist.length} {wishlist.length === 1 ? 'item' : 'items'} saved for later
+          </p>
         </div>
-        <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-[#181818] border border-white/10 text-[#C9A96E]">
-          {wishlist.length} item{wishlist.length !== 1 ? 's' : ''}
-        </span>
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {wishlist.map((w, i) => {
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        {wishlist.map((w) => {
           const shop = SHOPS.find((s) => s.id === w.shopId);
           const product = shop?.products.find((p) => p.id === w.prodId);
 
@@ -71,47 +60,59 @@ export default function WishlistPage() {
                 viewProduct(w.shopId, w.prodId);
                 router.push(`/explorer/product/${w.shopId}/${w.prodId}`);
               }}
-              className="group relative rounded-2xl bg-[#121212] hover:bg-[#161616] border border-white/[0.08] hover:border-white/[0.18] overflow-hidden transition-all duration-300 cursor-pointer shadow-sm hover:shadow-lg hover:-translate-y-1 flex flex-col justify-between"
+              className="group relative bg-white border border-[#E5E5E5] rounded-xl overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between"
             >
-              {/* Image */}
-              <div className="aspect-square bg-[#181818] relative overflow-hidden">
+              <div className="relative aspect-square w-full bg-[#F5F4F0] overflow-hidden">
                 <img
-                  src={prodImg(w.name, i)}
+                  src={w.image || 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=800&q=80'}
                   alt={w.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
 
-                {/* Remove button */}
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     if (product) toggleWish(w.shopId, w.prodId, product, w.shopName);
                   }}
-                  title="Remove from saved"
-                  className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/70 backdrop-blur-md border border-white/10 flex items-center justify-center text-[#ef4444] hover:bg-[#ef4444] hover:text-white transition-all shadow-md"
+                  className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/90 hover:bg-white shadow-sm flex items-center justify-center text-[#DC2626]"
+                  title="Remove from wishlist"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Info */}
-              <div className="p-3.5 flex flex-col justify-between flex-1">
+              <div className="p-3.5 flex flex-col flex-1 justify-between">
                 <div>
-                  <p className="text-[10px] font-mono font-bold uppercase text-[#71717A] tracking-wider truncate mb-1">
-                    {w.shopName}
-                  </p>
-                  <h4 className="font-serif font-bold text-xs sm:text-sm text-[#F5F5F5] group-hover:text-[#C9A96E] transition-colors line-clamp-1 mb-2">
+                  <span className="text-xs text-[#666666] block truncate font-medium">{w.shopName}</span>
+                  <h3 className="text-sm font-bold text-[#171717] line-clamp-1 group-hover:text-[#A85420] transition-colors mt-0.5">
                     {w.name}
-                  </h4>
+                  </h3>
+                  <p className="text-sm font-bold text-[#171717] mt-1.5">
+                    ₹{w.price.toLocaleString('en-IN')}
+                  </p>
                 </div>
 
-                <div className="flex items-baseline justify-between pt-2 border-t border-white/5 font-mono">
-                  <span className="text-sm font-bold text-[#C9A96E]">
-                    ₹{w.price.toLocaleString('en-IN')}
-                  </span>
-                  <span className="text-[10px] text-[#71717A]">/{w.unit}</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    addToCart({
+                      productId: w.prodId,
+                      name: w.name,
+                      price: w.price,
+                      unit: w.unit || 'piece',
+                      quantity: 1,
+                      shopId: w.shopId,
+                      shopName: w.shopName,
+                      image: w.image,
+                    });
+                  }}
+                  className="mt-3 w-full py-2 bg-[#A85420] hover:bg-[#873F17] text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <ShoppingBag className="w-3.5 h-3.5" />
+                  <span>Move to Cart</span>
+                </button>
               </div>
             </div>
           );

@@ -33,12 +33,14 @@ async function generateWithAnthropic(params: {
   city: string;
   fallbackTagline: string;
   fallbackDescription: string;
+  context?: string;
 }): Promise<AiResponse | null> {
   const prompt = `You are helping a local shop owner create profile text.
 
 Shop name: ${params.shopName}
 Category: ${params.categoryLabel}
 City: ${params.city}
+Shop style, products, audience and business details: ${params.context || 'not provided'}
 
 Return only valid JSON with this exact shape:
 {
@@ -89,6 +91,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const shopName = cleanText(body?.shopName, 120) || 'My Shop';
     const city = cleanText(body?.city, 80) || 'Meerut';
+    const context = [body?.subcategory, body?.shopStyle, body?.speciality, body?.targetAudience, body?.products, body?.businessType]
+      .map((value) => cleanText(value, 160))
+      .filter(Boolean)
+      .join('; ');
 
     const resolvedCategory = resolveShopCategory(body?.category);
     const seed = getCategorySeedData(resolvedCategory.id);
@@ -108,6 +114,7 @@ export async function POST(req: NextRequest) {
           city,
           fallbackTagline,
           fallbackDescription,
+          context,
         })
       : null;
 

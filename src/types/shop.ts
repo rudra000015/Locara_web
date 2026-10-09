@@ -107,13 +107,20 @@ export interface GooglePlacesData {
   priceLevel?: number;
 }
 
-export type ShopCategory = 'sweets' | 'grocery' | 'pharmacy' | 'general';
+export type ShopCategory = string;
 
 export interface Shop {
   id: string;
   placeId: string;
+  source?: 'locara' | 'google_places' | 'openstreetmap' | 'curated';
   name: string;
   cat: ShopCategory;
+  subcategory?: string;
+  tags?: string[];
+  keywords?: string[];
+  aiGeneratedDescription?: string;
+  isHeritage?: boolean;
+  heritageYears?: number;
   distanceMeters?: number;
 
   est: number;

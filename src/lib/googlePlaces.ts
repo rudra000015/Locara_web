@@ -2,7 +2,7 @@
 // Server-only — fetches live data (photos, hours, open status, nearby discovery) from Google Places API (New)
 import type { Shop } from '@/types/shop';
 import { toCanonicalShopCategory } from '@/lib/shopCategories';
-import { DEFAULT_HOURS, getLegacyBadge } from '@/data/shops';
+import { DEFAULT_HOURS } from '@/data/shops';
 
 const PLACES_BASE = 'https://places.googleapis.com/v1';
 const API_KEY = process.env.GOOGLE_PLACES_API_KEY;
@@ -19,41 +19,41 @@ export interface GoogleLiveData {
 }
 
 // Convert a Google Places API (New) place result into a Locara Shop
-export function mapGooglePlaceToShop(place: any): Shop {
+export function mapGooglePlaceToShop(place: any): Shop | null {
   const id = `gplace_${place.id || Math.random().toString(36).slice(2, 9)}`;
   const name = place.displayName?.text || place.name || 'Local Shop';
   const rawType = place.primaryType || (Array.isArray(place.types) ? place.types[0] : 'store');
   const cat = toCanonicalShopCategory(rawType);
 
-  const lat = place.location?.latitude ?? 28.6139;
-  const lng = place.location?.longitude ?? 77.2090;
+  const lat = place.location?.latitude;
+  const lng = place.location?.longitude;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
   const photos: string[] = (place.photos ?? [])
     .slice(0, 6)
     .map((p: any) => `/api/photo?name=${encodeURIComponent(p.name)}`);
 
   const userRatingCount = place.userRatingCount ?? 0;
-  // Estimate heritage age from review count / profile or default
-  const estYear = Math.max(1950, new Date().getFullYear() - Math.min(60, Math.floor(userRatingCount / 10) + 5));
-  const age = Math.max(1, new Date().getFullYear() - estYear);
-
   return {
     id,
     placeId: place.id || id,
+    source: 'google_places',
     name,
     cat,
-    est: estYear,
-    age,
-    owner: 'Verified Business',
+    subcategory: rawType.replace(/_/g, ' '),
+    keywords: Array.isArray(place.types) ? place.types : [],
+    est: new Date().getFullYear(),
+    age: 0,
+    owner: 'Google Maps listing',
     ownerImg: `https://api.dicebear.com/7.x/avataaars/svg?seed=${id}`,
-    story: `Popular local destination verified on Google Maps with ${userRatingCount} reviews.`,
-    addr: place.formattedAddress || 'Local Market, India',
+    story: `Business listing from Google Places${userRatingCount ? ` with ${userRatingCount} reviews` : ''}.`,
+    addr: place.formattedAddress || '',
     loc: [lat, lng],
-    badge: getLegacyBadge(age),
-    images: photos.length > 0 ? photos : ['https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=600&q=80'],
+    badge: 'rising',
+    images: photos,
     hours: DEFAULT_HOURS,
     reviews: [],
-    rating: place.rating ?? 4.5,
+    rating: place.rating ?? 0,
     totalRatings: userRatingCount,
     openNow: place.currentOpeningHours?.openNow ?? null,
     openingHours: place.regularOpeningHours?.weekdayDescriptions ?? [],
@@ -62,7 +62,7 @@ export function mapGooglePlaceToShop(place: any): Shop {
     website: place.websiteUri,
     products: [],
     ownerProfile: {
-      ownerName: 'Verified Business',
+      ownerName: 'Google Maps listing',
       ownerPhone: place.nationalPhoneNumber,
       fullAddress: place.formattedAddress,
       lat,
@@ -98,22 +98,12 @@ export async function searchGoogleNearbyShops(
           'places.nationalPhoneNumber',
           'places.websiteUri',
           'places.currentOpeningHours',
+          'places.regularOpeningHours',
         ].join(','),
       },
       body: JSON.stringify({
-        includedTypes: [
-          'store',
-          'clothing_store',
-          'bakery',
-          'jewelry_store',
-          'supermarket',
-          'grocery_store',
-          'pharmacy',
-          'home_goods_store',
-          'shopping_mall',
-          'market',
-        ],
         maxResultCount: 20,
+        rankPreference: 'DISTANCE',
         locationRestriction: {
           circle: {
             center: { latitude: lat, longitude: lng },
@@ -121,7 +111,6 @@ export async function searchGoogleNearbyShops(
           },
         },
       }),
-      next: { revalidate: 3600 },
     });
 
     if (!res.ok) {
@@ -130,8 +119,8 @@ export async function searchGoogleNearbyShops(
     }
 
     const data = await res.json();
-    const places = data.places || [];
-    return places.map(mapGooglePlaceToShop);
+    const places: any[] = data.places || [];
+    return places.map(mapGooglePlaceToShop).filter((shop): shop is Shop => Boolean(shop));
   } catch (err) {
     console.error('[googlePlaces] searchNearby failed:', err);
     return [];
@@ -180,10 +169,10 @@ export async function searchGoogleTextShops(
           'places.nationalPhoneNumber',
           'places.websiteUri',
           'places.currentOpeningHours',
+          'places.regularOpeningHours',
         ].join(','),
       },
       body: JSON.stringify(bodyPayload),
-      next: { revalidate: 3600 },
     });
 
     if (!res.ok) {
@@ -192,8 +181,8 @@ export async function searchGoogleTextShops(
     }
 
     const data = await res.json();
-    const places = data.places || [];
-    return places.map(mapGooglePlaceToShop);
+    const places: any[] = data.places || [];
+    return places.map(mapGooglePlaceToShop).filter((shop): shop is Shop => Boolean(shop));
   } catch (err) {
     console.error('[googlePlaces] searchText failed:', err);
     return [];
@@ -221,7 +210,6 @@ export async function fetchGoogleLiveData(placeId: string): Promise<GoogleLiveDa
           'priceLevel',
         ].join(','),
       },
-      next: { revalidate: 1800 },
     });
 
     if (!res.ok) return null;

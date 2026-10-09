@@ -15,12 +15,21 @@ export default function MapRoute() {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [selectedCity, setSelectedCity] = useState(getDefaultCity().name);
   const [useGps, setUseGps] = useState(false);
+  const [searchedLocation, setSearchedLocation] = useState<{ label: string; lat: number; lng: number } | null>(null);
 
-  const { shops, loading, error, refetch, userLocation } = useShops({
-    radius: 10000,
-    city: selectedCity,
+  const { shops, loading, error, locationError, refetch, userLocation, centerLocation } = useShops({
+    radius: 5000,
+    lat: searchedLocation?.lat,
+    lng: searchedLocation?.lng,
+    city: searchedLocation ? undefined : selectedCity,
     autoGps: useGps,
   });
+
+  const handleCityChange = (city: string) => {
+    setSearchedLocation(null);
+    setSelectedCity(city);
+    setUseGps(false);
+  };
 
   const handleStartNavigation = (shop: Shop) => {
     if (!shop.loc || shop.loc.length !== 2) return;
@@ -41,8 +50,9 @@ export default function MapRoute() {
         totalResults={shops.length}
         onRefetch={refetch}
         selectedCity={selectedCity}
-        onCityChange={setSelectedCity}
-        onUseGps={() => setUseGps(true)}
+        onCityChange={handleCityChange}
+        onUseGps={() => { setSearchedLocation(null); setUseGps(true); }}
+        onLocationSearch={(label, lat, lng) => { setSearchedLocation({ label, lat, lng }); setSelectedCity(label); setUseGps(false); }}
       />
       <main className="h-[calc(100vh-120px)] w-full">
         <MapPage
@@ -51,8 +61,9 @@ export default function MapRoute() {
           shops={shops}
           loading={loading}
           error={error}
+          locationError={locationError}
           userLocation={userLocation}
-          onRefetch={refetch}
+          centerLocation={centerLocation}
           onStartNavigation={handleStartNavigation}
         />
       </main>

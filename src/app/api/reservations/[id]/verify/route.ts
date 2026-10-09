@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDb } from "@/lib/mongodb";
 import { Reservation } from "@/models/Reservation";
+import { ShopProfile } from "@/models/ShopProfile";
 import { Visit, FootfallEvent } from "@/models/Visit";
 import { extractBearerToken, verifyAuthToken } from "@/lib/auth";
 
@@ -10,21 +11,19 @@ export async function POST(
 ) {
   try {
     const token = extractBearerToken(req);
-    let isSeller = false;
-    if (token) {
-      try {
-        const auth = verifyAuthToken(token);
-        if (auth.role === "owner") isSeller = true;
-      } catch {}
-    }
+    if (!token) return NextResponse.json({ error: "Owner sign-in required" }, { status: 401 });
+    const auth = verifyAuthToken(token);
+    if (auth.role !== "owner") return NextResponse.json({ error: "Only the shop owner can verify pickup" }, { status: 403 });
 
     const body = await req.json();
     const { otp, qrPayload, verificationMethod = "QR_SCAN" } = body;
 
     await connectDb();
+    const ownerShop = await ShopProfile.findOne({ ownerId: auth.id }).lean();
+    if (!ownerShop) return NextResponse.json({ error: "No shop is linked to this demo owner" }, { status: 404 });
 
     let reservation = await Reservation.findOne({
-      $or: [{ _id: params.id }, { reservationNumber: params.id }],
+      $and: [{ $or: [{ _id: params.id }, { reservationNumber: params.id }] }, { shopId: ownerShop.shopId }],
     });
 
     // If QR payload provided directly
@@ -32,7 +31,7 @@ export async function POST(
       try {
         const decoded = JSON.parse(Buffer.from(qrPayload, "base64").toString());
         if (decoded?.resNum) {
-          reservation = await Reservation.findOne({ reservationNumber: decoded.resNum });
+          reservation = await Reservation.findOne({ reservationNumber: decoded.resNum, shopId: ownerShop.shopId });
         }
       } catch {}
     }

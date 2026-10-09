@@ -1,304 +1,404 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useShopDetail } from '@/hooks/useShops';
 import { useStore } from '@/store/useStore';
-import { prodImg } from '@/utils/prodImg';
+import { SHOPS } from '@/data/shops';
 import ReservationDepositModal from './ReservationDepositModal';
 import {
-  ChevronLeft,
-  Heart,
-  Store,
   Star,
-  Clock,
-  Sparkles,
-  Share2,
   CheckCircle2,
-  Navigation,
+  Heart,
+  Share2,
   ShoppingBag,
   ShieldCheck,
-  Tag,
-  QrCode,
-  Check,
-  X,
-  MapPin,
-  ArrowRight,
+  Store,
+  RotateCcw,
+  Minus,
+  Plus,
+  ChevronRight,
+  Sparkles,
+  Lock,
 } from 'lucide-react';
 
-export default function ProductDetail() {
+interface Props {
+  shopId?: string;
+  productId?: string;
+}
+
+export default function ProductDetail({ shopId: propShopId, productId: propProdId }: Props) {
   const router = useRouter();
   const {
     currentShopId,
     currentProdId,
     openShop,
-    viewProduct,
     toggleWish,
     isWished,
     addToCart,
     createReservation,
     navTo,
     showToast,
-    user,
   } = useStore();
-  const { shop, loading, error } = useShopDetail(currentShopId);
 
-  const [selectedSize, setSelectedSize] = useState('M');
-  const [selectedColor, setSelectedColor] = useState('Natural');
+  const activeShopId = propShopId || currentShopId || 'sharma-handicrafts';
+  const activeProdId = propProdId || currentProdId || 'prod_lamp_1';
+
+  const { shop: fetchedShop } = useShopDetail(activeShopId);
+  const fallbackShop = SHOPS.find((s) => s.id === activeShopId) || SHOPS[0];
+  const s = fetchedShop || fallbackShop;
+
+  const product =
+    s.products.find((p) => p.id === activeProdId) ||
+    s.products[0] || {
+      id: 'prod_lamp_1',
+      name: 'Decorative Lamp',
+      price: 1200,
+      unit: 'piece',
+      inStock: true,
+      isNew: true,
+      discountPct: 20,
+      description:
+        'Beautiful handmade decorative lamp for home decor. Adds a traditional touch to your space with ambient warm lighting.',
+      category: 'Handicrafts',
+      image: 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=800&q=80',
+    };
+
+  const [selectedImage, setSelectedImage] = useState(
+    product.image || 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=800&q=80'
+  );
+  const [selectedColor, setSelectedColor] = useState('Brown');
+  const [selectedSize, setSelectedSize] = useState('Standard');
   const [quantity, setQuantity] = useState(1);
-  const [isReserveModalOpen, setIsReserveModalOpen] = useState(false);
-  const [confirmedPass, setConfirmedPass] = useState<any | null>(null);
+  const [isReserving, setIsReserving] = useState(false);
+  const [showDepositModal, setShowDepositModal] = useState(false);
 
-  // Form state
-  const [customerName, setCustomerName] = useState(user?.name || 'Rohan Mehta');
-  const [customerPhone, setCustomerPhone] = useState(user?.phone || '+91 98450 99881');
-  const [pickupWindow, setPickupWindow] = useState('Tomorrow (3 PM - 7 PM)');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const wished = isWished(s.id, product.id);
+  const discount = product.discountPct || 20;
+  const mrp = Math.round(product.price / (1 - discount / 100));
 
-  if (loading) {
-    return (
-      <div className="max-w-4xl mx-auto py-24 text-center">
-        <div className="w-10 h-10 mx-auto border-2 border-[#54512d] border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs text-[#7a776b] mt-4 font-mono tracking-wider uppercase">Loading atelier piece...</p>
-      </div>
-    );
-  }
+  // Calculations
+  const itemTotalPrice = product.price * quantity;
+  const reserveDeposit10 = Math.round(itemTotalPrice * 0.1);
+  const payAtShop90 = itemTotalPrice - reserveDeposit10;
 
-  const s = shop;
-  const p = s?.products.find((x) => x.id === currentProdId) || s?.products[0];
-  const prodIndex = s?.products.findIndex((x) => x.id === currentProdId) ?? 0;
-  const others = s?.products.filter((x) => x.id !== currentProdId).slice(0, 3) ?? [];
-
-  if (error || !s || !p) {
-    return (
-      <div className="max-w-md mx-auto py-24 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-[#ffffff] border border-[#cbc6b8] flex items-center justify-center text-2xl mx-auto mb-3 shadow-sm">
-          🔍
-        </div>
-        <h3 className="font-serif text-lg font-bold text-[#1b1c19] mb-1">Item Not Found</h3>
-        <p className="text-xs text-[#7a776b] mb-6">This atelier piece could not be retrieved.</p>
-        <button onClick={() => router.push('/products')} className="btn-primary-irl text-xs">
-          Browse Verified Drops →
-        </button>
-      </div>
-    );
-  }
-
-  const wished = isWished(s.id, p.id);
-  const imgSrc = p.image || prodImg(p.name, prodIndex);
+  const galleryImages = [
+    product.image || 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=800&q=80',
+    'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=800&q=80',
+    'https://images.unsplash.com/photo-1582562124811-c09040d0a901?w=800&q=80',
+  ];
 
   const handleAddToCart = () => {
     addToCart({
-      productId: p.id,
-      name: p.name,
-      price: p.price,
-      unit: p.unit || 'piece',
+      productId: product.id,
+      name: product.name,
+      price: product.price,
+      unit: product.unit || 'piece',
       size: selectedSize,
       color: selectedColor,
       quantity,
       shopId: s.id,
       shopName: s.name,
       shopAddress: s.addr,
-      image: imgSrc,
+      image: selectedImage,
     });
   };
 
-  const handleConfirmReservation = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+  const handleReserveDirectly = () => {
+    setIsReserving(true);
+    const pass = createReservation({
+      productId: product.id,
+      productName: product.name,
+      productImage: selectedImage,
+      price: itemTotalPrice,
+      shopId: s.id,
+      shopName: s.name,
+      shopAddress: s.addr,
+      shopPhone: s.phone || '+91 98370 12345',
+      shopLocation: s.loc || [28.9845, 77.7064],
+    });
 
     setTimeout(() => {
-      setIsSubmitting(false);
-      const newPass = createReservation({
-        productId: p.id,
-        productName: p.name,
-        productImage: imgSrc,
-        price: p.price,
-        shopId: s.id,
-        shopName: s.name,
-        shopAddress: s.addr,
-        shopPhone: s.phone || '+91 80 4123 9988',
-        shopLocation: s.loc as [number, number],
-        customerName,
-        customerPhone,
-        pickupDate: pickupWindow,
-        timeSlot: '3:00 PM - 7:00 PM',
-      });
-      setConfirmedPass(newPass);
+      setIsReserving(false);
+      navTo('reservations');
+      router.push('/explorer/reservations');
     }, 400);
   };
 
   return (
-    <div className="max-w-5xl mx-auto pb-32">
-      {/* Back Button */}
-      <button
-        onClick={() => {
-          openShop(s.id);
-          router.push(`/shops/${s.id}`);
-        }}
-        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#ffffff] border border-[rgba(72,55,47,0.12)] text-xs font-bold text-[#49473c] hover:text-[#1b1c19] hover:border-[#54512d] transition-all mb-6 cursor-pointer shadow-sm"
-      >
-        <ChevronLeft className="w-4 h-4" /> Back to {s.name}
-      </button>
+    <div className="min-h-screen bg-[#FAFAF8] pb-16">
+      {/* ── 1. Breadcrumbs ─────────────────────────────────── */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        <nav className="flex items-center gap-2 text-xs text-[#666666]">
+          <button
+            onClick={() => {
+              navTo('home');
+              router.push('/');
+            }}
+            className="hover:text-[#A85420]"
+          >
+            Home
+          </button>
+          <ChevronRight className="w-3.5 h-3.5 text-[#8A8A8A]" />
+          <button
+            onClick={() => {
+              openShop(s.id);
+              router.push(`/explorer/shop/${s.id}`);
+            }}
+            className="hover:text-[#A85420]"
+          >
+            {s.name}
+          </button>
+          <ChevronRight className="w-3.5 h-3.5 text-[#8A8A8A]" />
+          <span className="text-[#171717] font-semibold truncate">{product.name}</span>
+        </nav>
+      </div>
 
-      {/* Main Showcase Card */}
-      <div className="bg-[#ffffff] border border-[rgba(72,55,47,0.12)] rounded-2xl p-6 sm:p-10 shadow-[0_12px_32px_-4px_rgba(72,55,47,0.06)]">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-          {/* Media Image Gallery */}
-          <div className="md:col-span-6 aspect-square bg-[#efeee9] rounded-2xl overflow-hidden relative border border-[#cbc6b8]/50 shrink-0">
-            <img
-              src={imgSrc}
-              alt={p.name}
-              className="w-full h-full object-cover"
-            />
-            {p.isNew && (
-              <span className="absolute top-4 left-4 px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-[#54512d] text-[#ffffff] flex items-center gap-1 shadow-sm uppercase tracking-wider">
-                <Sparkles className="w-3 h-3 text-[#f0e9ba]" /> NEW OFFLINE DROP
-              </span>
-            )}
-            <button
-              onClick={() =>
-                toggleWish(
-                  s.id,
-                  p.id,
-                  {
-                    id: p.id,
-                    name: p.name,
-                    price: p.price,
-                    unit: p.unit || 'piece',
-                    inStock: true,
-                    isNew: Boolean(p.isNew),
-                    image: imgSrc,
-                    category: p.category || s.cat,
-                  },
-                  s.name
-                )
-              }
-              title={wished ? 'Remove from Wishlist' : 'Save to Wishlist'}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-[#ffffff]/90 backdrop-blur-md border border-[rgba(72,55,47,0.15)] flex items-center justify-center hover:scale-110 transition-all text-[#1b1c19] cursor-pointer shadow-sm"
-            >
-              <Heart
-                className={`w-5 h-5 ${wished ? 'text-[#ba1a1a] fill-[#ba1a1a]' : 'text-[#49473c]'}`}
+      {/* ── 2. Product Detail Main Container ───────────────── */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-2">
+        <div className="bg-white border border-[#E5E5E5] rounded-2xl p-4 sm:p-8 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
+          {/* Left: Image Gallery */}
+          <div className="space-y-4">
+            {/* Main Image */}
+            <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-[#F5F4F0] border border-[#E5E5E5]">
+              <img
+                src={selectedImage}
+                alt={product.name}
+                className="w-full h-full object-cover"
               />
-            </button>
+
+              {/* Wishlist Button */}
+              <button
+                type="button"
+                onClick={() =>
+                  toggleWish(
+                    s.id,
+                    product.id,
+                    {
+                      id: product.id,
+                      name: product.name,
+                      price: product.price,
+                      unit: product.unit || 'piece',
+                      inStock: true,
+                      isNew: Boolean(product.isNew),
+                      image: selectedImage,
+                    },
+                    s.name
+                  )
+                }
+                className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/90 hover:bg-white shadow flex items-center justify-center transition-all"
+              >
+                <Heart
+                  className={`w-4 h-4 ${
+                    wished ? 'fill-[#DC2626] text-[#DC2626]' : 'text-[#666666]'
+                  }`}
+                />
+              </button>
+
+              {discount > 0 && (
+                <div className="absolute top-3 left-3 bg-[#D92D20] text-white text-xs font-bold px-2.5 py-1 rounded shadow-sm">
+                  {discount}% OFF
+                </div>
+              )}
+            </div>
+
+            {/* Thumbnail Row */}
+            <div className="flex items-center gap-3">
+              {galleryImages.map((img, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setSelectedImage(img)}
+                  className={`w-16 h-16 rounded-lg overflow-hidden border-2 transition-all bg-[#F5F4F0] ${
+                    selectedImage === img
+                      ? 'border-[#A85420] shadow-sm'
+                      : 'border-[#E5E5E5] opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  <img src={img} alt="Thumbnail" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Details & Selectors */}
-          <div className="md:col-span-6 flex flex-col justify-between space-y-6">
-            <div>
-              {/* Origin Shop Link */}
-              <p
+          {/* Right: Product Info & Actions */}
+          <div className="space-y-5 flex flex-col justify-between">
+            <div className="space-y-4">
+              {/* Shop Link */}
+              <button
+                type="button"
                 onClick={() => {
                   openShop(s.id);
-                  router.push(`/shops/${s.id}`);
+                  router.push(`/explorer/shop/${s.id}`);
                 }}
-                className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-[#54512d] uppercase tracking-wider mb-2 cursor-pointer hover:underline"
+                className="text-xs font-semibold text-[#A85420] hover:underline flex items-center gap-1"
               >
-                <Store className="w-3.5 h-3.5 text-[#54512d]" />
-                {s.name} • {s.cat}
-              </p>
+                <Store className="w-3.5 h-3.5" />
+                <span>{s.name}</span>
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#2563EB] fill-[#2563EB]/10" />
+              </button>
 
-              <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#1b1c19] leading-tight mb-3">
-                {p.name}
+              {/* Product Title */}
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-[#171717] tracking-tight">
+                {product.name}
               </h1>
 
-              {/* Pricing */}
-              <div className="flex items-baseline gap-3 mb-4">
-                <span className="font-serif text-3xl font-bold text-[#1b1c19]">
-                  ₹{p.price.toLocaleString('en-IN')}
-                </span>
-                <span className="text-xs text-[#7a776b]">per {p.unit || 'piece'}</span>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#efeee9] text-[#54512d] border border-[#cbc6b8]">
-                  48H Counter Hold Free
-                </span>
-              </div>
-
-              {/* Status Pills */}
-              <div className="flex flex-wrap items-center gap-2 mb-5">
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#e8f5e9] text-[#2e7d32] border border-[#2e7d32]/30 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> In Physical Stock
-                </span>
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#f5f4ef] text-[#1b1c19] border border-[#cbc6b8]/50 flex items-center gap-1">
-                  <Star className="w-3.5 h-3.5 text-[#54512d] fill-[#54512d]" /> {s.rating} Rating
-                </span>
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#f5f4ef] text-[#54512d] border border-[#cbc6b8]/50 font-mono">
-                  {s.age} Yrs Heritage
-                </span>
-              </div>
-
-              {/* Description & Authenticity */}
-              <div className="p-4 rounded-xl bg-[#f5f4ef] border border-[#cbc6b8]/50 space-y-2 mb-6">
-                <div className="flex items-center gap-2 text-[11px] font-bold text-[#54512d] uppercase tracking-wider">
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Verified Authenticity</span>
+              {/* Rating & Stock */}
+              <div className="flex items-center gap-3 text-xs">
+                <div className="flex items-center gap-1 text-[#171717] font-bold">
+                  <Star className="w-4 h-4 fill-[#D97706] text-[#D97706]" />
+                  <span>4.7</span>
+                  <span className="text-[#8A8A8A] font-normal">(45 reviews)</span>
                 </div>
-                <p className="text-xs text-[#49473c] leading-relaxed">
-                  Crafted by master artisans. Available exclusively for offline inspection and in-person pickup.
-                </p>
+                <span>•</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-[#EBF8F0] text-[#16803C]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#16803C]" />
+                  In Stock
+                </span>
               </div>
 
-              {/* Physical Shop Information */}
-              <div className="p-4 rounded-xl bg-[#faf9f4] border border-[#cbc6b8]/60 flex items-center justify-between gap-3 mb-6">
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-[#1b1c19]">{s.name}</p>
-                  <p className="text-[11px] text-[#7a776b] truncate">{s.addr}</p>
+              {/* Price Row */}
+              <div className="flex items-baseline gap-3 pt-1">
+                <span className="text-3xl font-black text-[#171717]">
+                  ₹{product.price.toLocaleString('en-IN')}
+                </span>
+                <span className="text-base text-[#8A8A8A] line-through">
+                  ₹{mrp.toLocaleString('en-IN')}
+                </span>
+                <span className="text-xs font-bold text-[#16803C] bg-[#EBF8F0] px-2 py-0.5 rounded">
+                  {discount}% off
+                </span>
+              </div>
+
+              {/* Description */}
+              <p className="text-xs sm:text-sm text-[#666666] leading-relaxed">
+                {product.description ||
+                  'Beautiful handmade decorative lamp for home decor. Adds a traditional touch to your space with ambient warm lighting.'}
+              </p>
+
+              {/* Color Variants */}
+              <div>
+                <span className="text-xs font-bold text-[#171717] block mb-2">Color</span>
+                <div className="flex items-center gap-2">
+                  {['Brown', 'Black', 'White'].map((col) => (
+                    <button
+                      key={col}
+                      type="button"
+                      onClick={() => setSelectedColor(col)}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                        selectedColor === col
+                          ? 'bg-[#171717] text-white border-[#171717]'
+                          : 'bg-white text-[#171717] border-[#E5E5E5] hover:bg-[#F5F4F0]'
+                      }`}
+                    >
+                      {col}
+                    </button>
+                  ))}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (s.loc && s.loc.length === 2) {
-                      window.open(
-                        `https://www.google.com/maps/dir/?api=1&destination=${s.loc[0]},${s.loc[1]}`,
-                        '_blank'
-                      );
-                    }
-                  }}
-                  className="px-3 py-1.5 rounded-full bg-[#ffffff] hover:bg-[#efeee9] border border-[#cbc6b8] text-xs font-bold text-[#54512d] flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
-                >
-                  <Navigation className="w-3 h-3" /> Navigate
-                </button>
+              </div>
+
+              {/* Quantity Selector */}
+              <div>
+                <span className="text-xs font-bold text-[#171717] block mb-2">Quantity</span>
+                <div className="inline-flex items-center border border-[#E5E5E5] rounded-lg bg-[#FAFAF8]">
+                  <button
+                    type="button"
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="p-2 text-[#666666] hover:text-[#171717]"
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="px-4 text-xs font-bold text-[#171717]">{quantity}</span>
+                  <button
+                    type="button"
+                    onClick={() => setQuantity(quantity + 1)}
+                    className="p-2 text-[#666666] hover:text-[#171717]"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Price Details Breakdown Box */}
+              <div className="bg-[#F5F4F0] border border-[#E5E5E5] rounded-xl p-4 space-y-2">
+                <div className="flex items-center justify-between text-xs text-[#171717]">
+                  <span className="text-[#666666]">Total Price:</span>
+                  <span className="font-bold">₹{itemTotalPrice.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-[#16803C] font-semibold">
+                  <span>Reserve Online (10%):</span>
+                  <span>₹{reserveDeposit10.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-[#171717] font-semibold pt-1 border-t border-[#E5E5E5]">
+                  <span className="text-[#666666]">Pay at Shop (90%):</span>
+                  <span>₹{payAtShop90.toLocaleString('en-IN')}</span>
+                </div>
               </div>
             </div>
 
-            {/* Primary Actions: Cart & In-Store Pass Reservation */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-[#cbc6b8]/40">
-              <button
-                type="button"
-                onClick={handleAddToCart}
-                className="py-3 px-5 rounded-full bg-[#f5f4ef] hover:bg-[#efeee9] border border-[#cbc6b8] text-xs font-bold text-[#1b1c19] flex items-center justify-center gap-2 transition-all cursor-pointer"
-              >
-                <ShoppingBag className="w-4 h-4 text-[#54512d]" />
-                <span>Add to Pickup Bag</span>
-              </button>
+            {/* CTAs */}
+            <div className="space-y-3 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={handleAddToCart}
+                  className="w-full py-3 px-4 bg-white border border-[#A85420] text-[#A85420] hover:bg-[#FBF3EE] font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  <ShoppingBag className="w-4 h-4" />
+                  <span>Add to Cart</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setIsReserveModalOpen(true)}
-                className="btn-primary-irl flex-1 text-xs py-3 shadow-md"
-              >
-                <QrCode className="w-4 h-4" />
-                <span>Reserve In-Store Pass (10% Deposit) →</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDepositModal(true)}
+                  disabled={isReserving}
+                  className="w-full py-3 px-4 bg-[#A85420] hover:bg-[#873F17] text-white font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Reserve for Pickup</span>
+                </button>
+              </div>
+
+              {/* Trust Features */}
+              <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[#E5E5E5] text-center text-[11px] text-[#666666]">
+                <div className="flex items-center justify-center gap-1">
+                  <Lock className="w-3.5 h-3.5 text-[#16803C]" />
+                  <span>Secure Payment</span>
+                </div>
+                <div className="flex items-center justify-center gap-1">
+                  <Store className="w-3.5 h-3.5 text-[#A85420]" />
+                  <span>In-Store Pickup</span>
+                </div>
+                <div className="flex items-center justify-center gap-1">
+                  <RotateCcw className="w-3.5 h-3.5 text-[#2563EB]" />
+                  <span>Easy Return</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 10% Advance Payment & Reservation Modal */}
-      {isReserveModalOpen && (
+      {/* Reservation Deposit Modal */}
+      {showDepositModal && (
         <ReservationDepositModal
           item={{
-            id: p.id,
-            name: p.name,
-            image: imgSrc,
-            price: p.price,
+            id: product.id,
+            name: product.name,
+            image: selectedImage,
+            price: itemTotalPrice,
             shopId: s.id,
             shopName: s.name,
-            address: s.addr,
-            phone: s.phone,
-            location: s.loc as [number, number],
+            address: s.addr || 'Sadar Bazaar, Meerut',
+            phone: s.phone || '+91 98370 12345',
+            location: s.loc,
           }}
-          onClose={() => setIsReserveModalOpen(false)}
+          onClose={() => setShowDepositModal(false)}
+          onSuccess={() => {
+            setShowDepositModal(false);
+            navTo('reservations');
+            router.push('/explorer/reservations');
+          }}
         />
       )}
     </div>

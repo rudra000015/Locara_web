@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDb } from "@/lib/mongodb";
 import { Offer } from "@/models/Offer";
+import { ShopProfile } from "@/models/ShopProfile";
 import { extractBearerToken, verifyAuthToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -53,17 +54,34 @@ const SEED_OFFERS = [
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const shopId = searchParams.get("shopId");
     const flashSale = searchParams.get("flashSale");
+    const token = extractBearerToken(req);
+    const auth = token ? verifyAuthToken(token) : null;
+    const ownerView = auth?.role === "owner";
 
     try {
       await connectDb();
       const filter: Record<string, any> = { status: "ACTIVE" };
-      if (shopId) filter.shopId = shopId;
+      if (ownerView) {
+        const ownerShop = await ShopProfile.findOne({ ownerId: auth!.id }).sort({ updatedAt: -1 }).lean();
+        if (!ownerShop) return NextResponse.json({ offers: [], total: 0 });
+        filter.shopId = ownerShop.shopId;
+      } else {
+        const requestedShopId = searchParams.get("shopId");
+        if (requestedShopId) {
+          // Explorer routes may use the Mongo document id while owner content
+          // is stored against the public shop slug.
+          const shop = await ShopProfile.findOne({ shopId: requestedShopId }).select({ shopId: 1 }).lean()
+            ?? (/^[a-f\d]{24}$/i.test(requestedShopId)
+              ? await ShopProfile.findById(requestedShopId).select({ shopId: 1 }).lean()
+              : null);
+          filter.shopId = shop?.shopId ?? requestedShopId;
+        }
+      }
       if (flashSale === "true") filter.flashSale = true;
 
       const offers = await Offer.find(filter).sort({ createdAt: -1 }).lean();
-      if (offers.length > 0) {
+      if (ownerView || offers.length > 0) {
         return NextResponse.json({
           offers: offers.map((o) => ({ ...o, id: o._id.toString() })),
           total: offers.length,
@@ -71,6 +89,8 @@ export async function GET(req: NextRequest) {
       }
     } catch {}
 
+    if (ownerView) return NextResponse.json({ offers: [], total: 0 });
+    const shopId = searchParams.get("shopId");
     let filtered = SEED_OFFERS;
     if (shopId) filtered = filtered.filter((o) => o.shopId === shopId);
     if (flashSale === "true") filtered = filtered.filter((o) => o.flashSale);
@@ -104,24 +124,29 @@ export async function POST(req: NextRequest) {
       badgeText,
       flashSale = false,
       endDate,
-      shopId,
-      shopName,
+      applicableProducts = [],
     } = body;
 
     if (!title || !discountValue) {
       return NextResponse.json({ error: "Offer title and discount value are required" }, { status: 400 });
     }
+    if (!Number.isFinite(Number(discountValue)) || Number(discountValue) <= 0) {
+      return NextResponse.json({ error: "Enter a valid positive discount value" }, { status: 400 });
+    }
 
     await connectDb();
+    const ownedShop = await ShopProfile.findOne({ ownerId: auth.id }).sort({ updatedAt: -1 }).lean();
+    if (!ownedShop) return NextResponse.json({ error: "Register your shop before creating an offer" }, { status: 404 });
 
     const created = await Offer.create({
-      shopId: shopId || `shop_${auth.id}`,
-      shopName: shopName || "Heritage Store",
+      shopId: ownedShop.shopId,
+      shopName: ownedShop.name,
       title: title.trim(),
       description: description ? description.trim() : "",
       discountType,
       discountValue: Number(discountValue),
       badgeText: badgeText ? badgeText.trim() : `${discountValue}% OFF`,
+      applicableProducts: Array.isArray(applicableProducts) ? applicableProducts.map(String).slice(0, 100) : [],
       flashSale: Boolean(flashSale),
       startDate: new Date(),
       endDate: endDate ? new Date(endDate) : new Date(Date.now() + 10 * 24 * 3600 * 1000),

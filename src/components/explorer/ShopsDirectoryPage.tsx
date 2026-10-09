@@ -1,204 +1,332 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useShops } from '@/hooks/useShops';
 import { useStore } from '@/store/useStore';
-import { Shop } from '@/types/shop';
-import { CATEGORIES } from '@/data/categories';
+import { SHOPS } from '@/data/shops';
+import ShopCard from './ShopCard';
 import {
-  Store,
-  MapPin,
+  SlidersHorizontal,
+  X,
   Star,
-  Clock,
-  Sparkles,
-  ArrowRight,
-  Filter,
-  CheckCircle2,
-  Phone,
-  MessageCircle,
+  ChevronDown,
+  RotateCcw,
+  Check,
 } from 'lucide-react';
+
+const CATEGORY_OPTIONS = [
+  { id: 'fashion', label: 'Fashion' },
+  { id: 'jewellery', label: 'Jewellery' },
+  { id: 'handicrafts', label: 'Handicrafts' },
+  { id: 'home-decor', label: 'Home Decor' },
+  { id: 'food', label: 'Food' },
+  { id: 'beauty', label: 'Beauty' },
+  { id: 'electronics', label: 'Electronics' },
+  { id: 'others', label: 'Others' },
+];
 
 export default function ShopsDirectoryPage() {
   const router = useRouter();
-  const { openShop } = useStore();
-  const { shops, loading, error } = useShops({ radius: 10000 });
+  const searchParams = useSearchParams();
+  const initialCategory = searchParams.get('category') || '';
+  const initialQuery = searchParams.get('q') || '';
+  const { userLocation, requestUserLocation } = useStore();
 
-  const [search, setSearch] = useState('');
-  const [selectedCat, setSelectedCat] = useState('all');
+  const { shops: liveShops } = useShops({
+    radius: 10000,
+    lat: userLocation.latitude ?? undefined,
+    lng: userLocation.longitude ?? undefined,
+  });
+  const allShops = liveShops && liveShops.length > 0 ? liveShops : SHOPS;
+
+  const [search, setSearch] = useState(initialQuery);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(
+    initialCategory ? [initialCategory] : []
+  );
+  const [distanceMax, setDistanceMax] = useState(10);
+  const [minRating, setMinRating] = useState<number | null>(null);
   const [openOnly, setOpenOnly] = useState(false);
+  const [sortBy, setSortBy] = useState('nearest');
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
-  const filteredShops = useMemo(() => {
-    return shops.filter((s) => {
-      const matchQuery =
-        s.name.toLowerCase().includes(search.toLowerCase()) ||
-        s.addr.toLowerCase().includes(search.toLowerCase()) ||
-        (s.story ?? '').toLowerCase().includes(search.toLowerCase());
-
-      const matchCat = selectedCat === 'all' || s.cat === selectedCat;
-      const matchOpen = !openOnly || s.openNow !== false;
-
-      return matchQuery && matchCat && matchOpen;
-    });
-  }, [shops, search, selectedCat, openOnly]);
-
-  const handleOpenShop = (shopId: string) => {
-    openShop(shopId);
-    router.push(`/shops/${shopId}`);
+  const handleSortChange = async (newSort: string) => {
+    setSortBy(newSort);
+    if (newSort === 'nearest' && userLocation.latitude === null) {
+      await requestUserLocation();
+    }
   };
 
-  return (
-    <div className="py-4 pb-20 space-y-8">
-      {/* Header */}
+  const toggleCategory = (catId: string) => {
+    setSelectedCategories((prev) =>
+      prev.includes(catId) ? prev.filter((c) => c !== catId) : [...prev, catId]
+    );
+  };
+
+  const handleClearAll = () => {
+    setSelectedCategories([]);
+    setDistanceMax(10);
+    setMinRating(null);
+    setOpenOnly(false);
+    setSearch('');
+  };
+
+  const filteredShops = useMemo(() => {
+    return allShops
+      .filter((s) => {
+        const matchQuery =
+          !search ||
+          s.name.toLowerCase().includes(search.toLowerCase()) ||
+          s.addr.toLowerCase().includes(search.toLowerCase()) ||
+          (s.cat ?? '').toLowerCase().includes(search.toLowerCase());
+
+        const matchCat =
+          selectedCategories.length === 0 ||
+          selectedCategories.includes(s.cat?.toLowerCase() || '') ||
+          selectedCategories.includes(s.subcategory?.toLowerCase() || '');
+
+        const matchRating = !minRating || (s.rating || 0) >= minRating;
+        const matchOpen = !openOnly || s.openNow !== false;
+
+        return matchQuery && matchCat && matchRating && matchOpen;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'highest-rated') return (b.rating || 0) - (a.rating || 0);
+        if (sortBy === 'newest') return (b.est || 0) - (a.est || 0);
+        if (sortBy === 'most-popular') return (b.totalRatings || 0) - (a.totalRatings || 0);
+        return (a.distanceMeters || 1000) - (b.distanceMeters || 1000);
+      });
+  }, [allShops, search, selectedCategories, minRating, openOnly, sortBy]);
+
+  const filterSidebar = (
+    <div className="bg-white border border-[#E5E5E5] rounded-xl p-5 space-y-6 shadow-sm">
+      {/* Filter Header */}
+      <div className="flex items-center justify-between border-b border-[#E5E5E5] pb-3">
+        <h3 className="font-bold text-sm text-[#171717]">Filters</h3>
+        <button
+          type="button"
+          onClick={handleClearAll}
+          className="text-xs font-semibold text-[#A85420] hover:text-[#873F17]"
+        >
+          Clear All
+        </button>
+      </div>
+
+      {/* Categories */}
       <div>
-        <div className="flex items-center gap-2 mb-1.5">
-          <Store className="w-4 h-4 text-[#C8893F]" />
-          <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#C8893F]">
-            VERIFIED PHYSICAL STORES
-          </span>
+        <h4 className="text-xs font-bold text-[#171717] uppercase tracking-wider mb-3">
+          Categories
+        </h4>
+        <div className="space-y-2">
+          {CATEGORY_OPTIONS.map((cat) => {
+            const isChecked = selectedCategories.includes(cat.id);
+            return (
+              <label
+                key={cat.id}
+                className="flex items-center gap-2 text-xs text-[#171717] cursor-pointer hover:text-[#A85420]"
+              >
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => toggleCategory(cat.id)}
+                  className="w-4 h-4 rounded border-[#E5E5E5] text-[#A85420] focus:ring-[#A85420] accent-[#A85420]"
+                />
+                <span>{cat.label}</span>
+              </label>
+            );
+          })}
         </div>
-        <h1 className="font-serif text-3xl sm:text-5xl font-black text-fg-heading">
-          Local Shops
-        </h1>
-        <p className="text-xs sm:text-sm text-fg-secondary mt-1">
-          Find authentic multi-generational storefronts worth discovering in your city.
-        </p>
       </div>
 
-      {/* Filter Bar */}
-      <div className="p-4 rounded-2xl bg-bg-card border border-border flex flex-col md:flex-row items-center justify-between gap-4">
-        {/* Search */}
+      {/* Distance */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-xs font-bold text-[#171717] uppercase tracking-wider">
+            Distance
+          </h4>
+          <span className="text-xs font-medium text-[#666666]">{distanceMax} km</span>
+        </div>
         <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by shop name, sweets, silk, jewelry..."
-          className="w-full md:w-80 px-4 py-2 rounded-xl bg-bg-subtle border border-border text-xs text-fg placeholder-fg-muted outline-none focus:border-[#C8893F]"
+          type="range"
+          min="1"
+          max="25"
+          value={distanceMax}
+          onChange={(e) => setDistanceMax(Number(e.target.value))}
+          className="w-full h-1.5 bg-[#E5E5E5] rounded-lg appearance-none cursor-pointer accent-[#A85420]"
         />
+      </div>
 
-        {/* Category & Open Filter Controls */}
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          <select
-            value={selectedCat}
-            onChange={(e) => setSelectedCat(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-bg-subtle border border-border text-xs text-fg font-medium outline-none cursor-pointer"
-          >
-            <option value="all">All Specialties</option>
-            <option value="sweets">Sweets & Mithai</option>
-            <option value="textiles">Bridal & Sarees</option>
-            <option value="jewellery">Handcrafted Jewelry</option>
-            <option value="crafts">Heritage Handicrafts</option>
-            <option value="grocery">Traditional Spices</option>
-          </select>
-
-          <button
-            type="button"
-            onClick={() => setOpenOnly(!openOnly)}
-            className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-              openOnly
-                ? 'bg-[#10B981]/20 border-[#10B981] text-[#10B981]'
-                : 'bg-bg-subtle border-border text-fg-muted hover:text-fg'
-            }`}
-          >
-            ● Open Now Only
-          </button>
+      {/* Rating */}
+      <div>
+        <h4 className="text-xs font-bold text-[#171717] uppercase tracking-wider mb-3">
+          Rating
+        </h4>
+        <div className="space-y-2">
+          {[4, 3].map((stars) => (
+            <label
+              key={stars}
+              className="flex items-center gap-2 text-xs text-[#171717] cursor-pointer hover:text-[#A85420]"
+            >
+              <input
+                type="radio"
+                name="rating"
+                checked={minRating === stars}
+                onChange={() => setMinRating(minRating === stars ? null : stars)}
+                className="w-4 h-4 text-[#A85420] focus:ring-[#A85420] accent-[#A85420]"
+              />
+              <div className="flex items-center gap-1">
+                <div className="flex text-[#D97706]">
+                  {Array.from({ length: stars }).map((_, i) => (
+                    <Star key={i} className="w-3.5 h-3.5 fill-current" />
+                  ))}
+                </div>
+                <span>{stars} & above</span>
+              </div>
+            </label>
+          ))}
         </div>
       </div>
 
-      {/* Editorial List Layout matching Section 7 */}
-      {loading ? (
-        <div className="space-y-4">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-36 rounded-3xl bg-bg-card border border-border skeleton-shimmer" />
-          ))}
-        </div>
-      ) : filteredShops.length === 0 ? (
-        <div className="text-center py-20 bg-bg-card rounded-3xl border border-border">
-          <Store className="w-10 h-10 text-fg-muted mx-auto mb-2" />
-          <p className="font-serif text-lg font-bold text-fg-heading">No shops matching filters</p>
-          <p className="text-xs text-fg-muted mt-1">Try resetting the search terms or filters.</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredShops.map((shop) => (
-            <div
-              key={shop.id}
-              onClick={() => handleOpenShop(shop.id)}
-              className="p-5 sm:p-6 rounded-3xl bg-bg-card border border-border hover:border-[#C8893F] transition-all cursor-pointer shadow-md hover:shadow-xl group flex flex-col md:flex-row md:items-center justify-between gap-6"
-            >
-              {/* Left Image & Metadata */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 min-w-0">
-                <div className="w-full sm:w-32 sm:h-32 aspect-video sm:aspect-square rounded-2xl overflow-hidden bg-bg-subtle shrink-0 border border-border relative">
-                  <img
-                    src={shop.images?.[0] || shop.photos?.[0] || 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=600'}
-                    alt={shop.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/80 backdrop-blur-md text-[9px] font-mono text-[#E0AF62] font-bold">
-                    Est. {shop.est}
-                  </span>
-                </div>
+      {/* Open Now Toggle */}
+      <div className="pt-2 border-t border-[#E5E5E5]">
+        <label className="flex items-center justify-between cursor-pointer">
+          <span className="text-xs font-bold text-[#171717]">Open Now Only</span>
+          <input
+            type="checkbox"
+            checked={openOnly}
+            onChange={(e) => setOpenOnly(e.target.checked)}
+            className="w-4 h-4 rounded text-[#A85420] focus:ring-[#A85420] accent-[#A85420]"
+          />
+        </label>
+      </div>
+    </div>
+  );
 
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                    <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        shop.openNow !== false
-                          ? 'bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30'
-                          : 'bg-[#E11D48]/15 text-[#E11D48] border border-[#E11D48]/30'
-                      }`}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${shop.openNow !== false ? 'bg-[#10B981] animate-pulse' : 'bg-[#E11D48]'}`} />
-                      {shop.openNow !== false ? 'OPEN NOW' : 'CLOSED'}
-                    </span>
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {/* Top Mobile Filter & Sort Bar */}
+      <div className="md:hidden flex items-center justify-between gap-3 mb-4">
+        <button
+          type="button"
+          onClick={() => setMobileFilterOpen(true)}
+          className="flex-1 py-2 px-3 bg-white border border-[#E5E5E5] rounded-lg text-xs font-bold text-[#171717] flex items-center justify-center gap-2 shadow-sm"
+        >
+          <SlidersHorizontal className="w-4 h-4 text-[#A85420]" />
+          <span>Filters</span>
+          {selectedCategories.length > 0 && (
+            <span className="w-4 h-4 rounded-full bg-[#A85420] text-white text-[10px] flex items-center justify-center">
+              {selectedCategories.length}
+            </span>
+          )}
+        </button>
 
-                    {shop.rating > 0 && (
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-fg bg-bg-subtle px-2.5 py-0.5 rounded-full border border-border">
-                        <Star className="w-3 h-3 text-[#C8893F] fill-[#C8893F]" /> {shop.rating.toFixed(1)}
-                      </span>
-                    )}
+        <select
+          value={sortBy}
+          onChange={(e) => handleSortChange(e.target.value)}
+          className="py-2 px-3 bg-white border border-[#E5E5E5] rounded-lg text-xs font-semibold text-[#171717] outline-none shadow-sm cursor-pointer"
+        >
+          <option value="nearest">Sort: Nearest</option>
+          <option value="highest-rated">Highest Rated</option>
+          <option value="most-popular">Most Popular</option>
+          <option value="newest">Newest</option>
+        </select>
+      </div>
 
-                    <span className="text-[10px] font-mono text-[#E0AF62]">
-                      {shop.age} Yrs Heritage
-                    </span>
-                  </div>
+      {/* Main 2-Column Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {/* Desktop Left Sidebar */}
+        <aside className="hidden md:block md:col-span-1">
+          {filterSidebar}
+        </aside>
 
-                  <h2 className="font-serif text-xl sm:text-2xl font-bold text-fg-heading group-hover:text-[#C8893F] transition-colors">
-                    {shop.name}
-                  </h2>
+        {/* Right Shop Results Column */}
+        <main className="md:col-span-3 space-y-4">
+          {/* Header Bar */}
+          <div className="hidden md:flex items-center justify-between bg-white border border-[#E5E5E5] rounded-xl px-5 py-3 shadow-sm">
+            <span className="text-sm font-bold text-[#171717]">
+              {filteredShops.length} shops found
+            </span>
 
-                  <p className="text-xs text-fg-muted flex items-center gap-1 mt-1">
-                    <MapPin className="w-3.5 h-3.5 text-[#C8893F] shrink-0" />
-                    {shop.addr}
-                  </p>
-
-                  <p className="text-xs text-fg-secondary line-clamp-1 mt-1 font-serif italic max-w-xl">
-                    {shop.story || 'Celebrated family-run artisan boutique preserving age-old craftsmanship.'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Right CTA */}
-              <div className="flex items-center justify-between md:flex-col md:items-end gap-3 shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-border">
-                <div className="text-left md:text-right">
-                  <span className="text-[10px] font-mono text-[#10B981] font-bold uppercase block">
-                    ● In-Store Pickup Active
-                  </span>
-                  <span className="text-xs text-fg-muted">
-                    {shop.products?.length || 8} items available
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  className="btn-gold text-xs px-4 py-2"
-                >
-                  <span>View Shop</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-[#666666]">Sort By:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => handleSortChange(e.target.value)}
+                className="py-1 px-3 bg-[#F5F4F0] border border-[#E5E5E5] rounded-lg text-xs font-semibold text-[#171717] outline-none cursor-pointer"
+              >
+                <option value="nearest">Nearest</option>
+                <option value="highest-rated">Highest Rated</option>
+                <option value="most-popular">Most Popular</option>
+                <option value="newest">Newest</option>
+              </select>
             </div>
-          ))}
+          </div>
+
+          {/* Results List */}
+          {filteredShops.length > 0 ? (
+            <div className="space-y-4">
+              {filteredShops.map((shop) => (
+                <ShopCard key={shop.id} shop={shop} layout="list" />
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white border border-[#E5E5E5] rounded-xl p-12 text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-[#F5F4F0] text-[#666666] flex items-center justify-center mx-auto">
+                <SlidersHorizontal className="w-6 h-6" />
+              </div>
+              <h3 className="font-bold text-base text-[#171717]">No shops match your criteria</h3>
+              <p className="text-xs text-[#666666] max-w-sm mx-auto">
+                Try clearing some filters or searching for another category.
+              </p>
+              <button
+                type="button"
+                onClick={handleClearAll}
+                className="px-4 py-2 bg-[#A85420] text-white text-xs font-semibold rounded-lg hover:bg-[#873F17] transition-colors"
+              >
+                Reset All Filters
+              </button>
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* Mobile Filter Modal */}
+      {mobileFilterOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white w-full max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[85vh] overflow-y-auto p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E5E5E5] pb-3">
+              <h3 className="font-bold text-base text-[#171717]">Filters</h3>
+              <button
+                type="button"
+                onClick={() => setMobileFilterOpen(false)}
+                className="p-1 text-[#666666] hover:text-[#171717]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {filterSidebar}
+
+            <div className="pt-3 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  handleClearAll();
+                  setMobileFilterOpen(false);
+                }}
+                className="flex-1 py-2.5 bg-[#F5F4F0] text-[#171717] font-semibold text-xs rounded-lg"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileFilterOpen(false)}
+                className="flex-1 py-2.5 bg-[#A85420] text-white font-bold text-xs rounded-lg"
+              >
+                Apply Filters ({filteredShops.length})
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

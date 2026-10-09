@@ -19,7 +19,9 @@ interface UseShopsReturn {
   shops: Shop[];
   loading: boolean;
   error: string | null;
+  locationError: string | null;
   userLocation: { lat: number; lng: number } | null;
+  centerLocation: { lat: number; lng: number } | null;
   refetch: (searchQuery?: string) => Promise<void>;
 }
 
@@ -41,7 +43,9 @@ export function useShops(opts: UseShopsOptions = {}): UseShopsReturn {
   const [shops, setShops] = useState<Shop[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [centerLocation, setCenterLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const resolvedLat = useRef<number>(asNumber(lat) ?? getDefaultCity().lat);
   const resolvedLng = useRef<number>(asNumber(lng) ?? getDefaultCity().lng);
@@ -92,6 +96,8 @@ export function useShops(opts: UseShopsOptions = {}): UseShopsReturn {
     }
   }, [city, radius]);
 
+  const refetch = useCallback((searchQuery?: string) => fetchShops(searchQuery), [fetchShops]);
+
   useEffect(() => {
     if (!enabled) return;
 
@@ -99,13 +105,16 @@ export function useShops(opts: UseShopsOptions = {}): UseShopsReturn {
     let watchId: number | null = null;
 
     const load = async () => {
+      setLocationError(null);
       const explicitLat = asNumber(lat);
       const explicitLng = asNumber(lng);
 
       if (explicitLat !== undefined && explicitLng !== undefined) {
         resolvedLat.current = explicitLat;
         resolvedLng.current = explicitLng;
-        setUserLocation({ lat: explicitLat, lng: explicitLng });
+        setLocationError(null);
+        setUserLocation(null);
+        setCenterLocation({ lat: explicitLat, lng: explicitLng });
         await fetchShops(query, { lat: explicitLat, lng: explicitLng });
         return;
       }
@@ -113,11 +122,17 @@ export function useShops(opts: UseShopsOptions = {}): UseShopsReturn {
       const cityInfo = getCityByName(city) ?? getDefaultCity();
       resolvedLat.current = cityInfo.lat;
       resolvedLng.current = cityInfo.lng;
+      setUserLocation(null);
+      setCenterLocation(null);
 
       // Immediate fetch with default/selected city coordinates
       void fetchShops(query, { lat: cityInfo.lat, lng: cityInfo.lng });
 
-      if (!autoGps || typeof navigator === 'undefined' || !navigator.geolocation) {
+      if (!autoGps) {
+        return;
+      }
+      if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        setLocationError('Location is not available in this browser. Showing shops near the selected city.');
         return;
       }
 
@@ -126,7 +141,9 @@ export function useShops(opts: UseShopsOptions = {}): UseShopsReturn {
 
         resolvedLat.current = nextLat;
         resolvedLng.current = nextLng;
+        setLocationError(null);
         setUserLocation({ lat: nextLat, lng: nextLng });
+        setCenterLocation({ lat: nextLat, lng: nextLng });
 
         const movedDistance = lastFetchCoords.current
           ? getDistanceMeters(lastFetchCoords.current.lat, lastFetchCoords.current.lng, nextLat, nextLng)
@@ -141,8 +158,12 @@ export function useShops(opts: UseShopsOptions = {}): UseShopsReturn {
         (pos) => {
           void handleCoords(pos.coords.latitude, pos.coords.longitude, true);
         },
-        () => {
-          // GPS denied or timed out - city coordinates are already loaded
+        (geoError) => {
+          if (!cancelled) {
+            setLocationError(geoError.code === geoError.PERMISSION_DENIED
+              ? 'Location permission was denied. Showing shops near the selected city.'
+              : 'Could not get your location. Showing shops near the selected city.');
+          }
         },
         {
           enableHighAccuracy: false,
@@ -178,8 +199,10 @@ export function useShops(opts: UseShopsOptions = {}): UseShopsReturn {
     shops,
     loading,
     error,
+    locationError,
     userLocation,
-    refetch: (searchQuery?: string) => fetchShops(searchQuery),
+    centerLocation,
+    refetch,
   };
 }
 

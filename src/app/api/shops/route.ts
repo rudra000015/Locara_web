@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-
 import { shopImages, SHOPS } from '@/data/shops';
 import { extractBearerToken, verifyAuthToken } from '@/lib/auth';
 import { getCityByName, getDefaultCity } from '@/lib/cities';
 import { connectDb } from '@/lib/mongodb';
-import { searchNearbyShops, textSearchShops } from '@/lib/overpass';
 import { resolveShopCategory } from '@/lib/shopCategories';
 import { mapDbShopToShop, getAllSeedShops } from '@/lib/shopMapper';
-import { searchGoogleNearbyShops, searchGoogleTextShops } from '@/lib/googlePlaces';
 import { getDistanceMeters } from '@/lib/geo';
 import { ShopProfile } from '@/models/ShopProfile';
 import { User } from '@/models/User';
@@ -57,7 +54,8 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const q = (searchParams.get('q') ?? '').trim();
   const city = (searchParams.get('city') ?? '').trim();
-  const radius = toNumber(searchParams.get('radius')) ?? 10000;
+  const requestedRadius = toNumber(searchParams.get('radius')) ?? 5000;
+  const radius = Math.min(25000, Math.max(1000, requestedRadius));
 
   const inputLat = toNumber(searchParams.get('lat'));
   const inputLng = toNumber(searchParams.get('lng'));
@@ -81,34 +79,33 @@ export async function GET(req: NextRequest) {
         shop.name,
         shop.addr,
         shop.cat,
+        shop.subcategory ?? '',
         shop.story ?? '',
-        ...(shop.products ?? []).map((p) => p.name),
+        shop.aiGeneratedDescription ?? '',
+        ...(shop.tags ?? []),
+        ...(shop.keywords ?? []),
+        ...(shop.products ?? []).flatMap((p) => [p.name, p.category ?? '', p.description ?? '']),
       ]
         .join(' ')
         .toLowerCase();
-      const matchesText = tokens.some((token) => hay.includes(token));
+      const matchesText = tokens.every((token) => hay.includes(token));
       if (!matchesText) return false;
     }
 
     // Check city / proximity filter
-    if (city) {
+    if (shop.loc && shop.loc.length === 2) {
+      const dist = getDistanceMeters(lat, lng, shop.loc[0], shop.loc[1]);
+      if (dist > radius) return false;
+    } else if (city) {
       const cityLower = city.toLowerCase();
-      const matchesCityName = shop.addr.toLowerCase().includes(cityLower);
-      if (matchesCityName) return true;
-
-      // Check distance from current city / coordinates
-      if (shop.loc && shop.loc.length === 2) {
-        const dist = getDistanceMeters(lat, lng, shop.loc[0], shop.loc[1]);
-        if (dist <= Math.max(radius, 35000)) return true;
-      }
-      return false;
+      if (!shop.addr.toLowerCase().includes(cityLower)) return false;
     }
 
     return true;
   });
 
   // If city filter returned 0, provide closest curated shops so map is never empty
-  const effectiveCurated = curatedMatches.length > 0 ? curatedMatches : allCuratedShops;
+  const effectiveCurated = curatedMatches;
 
   // 3. Query MongoDB ShopProfile if connected
   let dbShops: Shop[] = [];
@@ -121,21 +118,22 @@ export async function GET(req: NextRequest) {
     }
 
     if (tokens.length > 0) {
-      baseFilter.$or = [
-        { name: { $regex: q, $options: 'i' } },
-        { category: { $regex: q, $options: 'i' } },
-        { address: { $regex: q, $options: 'i' } },
-        { tags: { $elemMatch: { $regex: q, $options: 'i' } } },
-        { specialties: { $elemMatch: { $regex: q, $options: 'i' } } },
-      ];
+      const searchableFields = ['name', 'category', 'subcategory', 'description', 'aiGeneratedDescription', 'address', 'tags', 'specialties', 'keywords', 'products.name', 'products.category', 'products.description'];
+      baseFilter.$and = tokens.map((token) => {
+        const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return {
+          $or: searchableFields.map((field) => ({ [field]: { $regex: escaped, $options: 'i' } })),
+        };
+      });
     }
 
     const docs = await ShopProfile.find({
       ...baseFilter,
+      status: 'APPROVED',
       location: {
         $nearSphere: {
           $geometry: { type: 'Point', coordinates: [lng, lat] },
-          $maxDistance: Math.max(radius, 50000),
+          $maxDistance: radius,
         },
       },
     })
@@ -147,42 +145,11 @@ export async function GET(req: NextRequest) {
     console.warn('[GET /api/shops] MongoDB fetch fallback:', dbErr?.message ?? dbErr);
   }
 
-  // 4. Overpass OpenStreetMap discovery with quick timeout
-  let osmShops: Shop[] = [];
-  try {
-    const osmPromise = q.length > 0
-      ? textSearchShops(q, lat, lng, radius)
-      : searchNearbyShops(lat, lng, radius);
-
-    const timeoutPromise = new Promise<Shop[]>((resolve) => {
-      setTimeout(() => resolve([]), 2500);
-    });
-
-    osmShops = await Promise.race([osmPromise, timeoutPromise]);
-  } catch (err: any) {
-    console.warn('[GET /api/shops] Overpass fetch skipped/failed:', err?.message ?? err);
-  }
-
-  // 5. Google Places API (New) discovery if GOOGLE_PLACES_API_KEY is configured
-  let googlePlacesShops: Shop[] = [];
-  try {
-    if (process.env.GOOGLE_PLACES_API_KEY) {
-      const gPromise = q.length > 0
-        ? searchGoogleTextShops(q, lat, lng, radius)
-        : searchGoogleNearbyShops(lat, lng, radius);
-
-      const gTimeout = new Promise<Shop[]>((resolve) => {
-        setTimeout(() => resolve([]), 3000);
-      });
-
-      googlePlacesShops = await Promise.race([gPromise, gTimeout]);
-    }
-  } catch (gErr: any) {
-    console.warn('[GET /api/shops] Google Places fetch skipped/failed:', gErr?.message ?? gErr);
-  }
-
-  // 6. Merge, calculate distance, and deduplicate
-  const merged = [...dbShops, ...effectiveCurated, ...googlePlacesShops, ...osmShops];
+  // Merge MongoDB shops and local curated shops
+  const merged = [
+    ...dbShops,
+    ...effectiveCurated.map((shop) => ({ ...shop, source: shop.source ?? 'curated' as const })),
+  ];
   const mapById = new Map<string, Shop>();
 
 
@@ -213,9 +180,7 @@ export async function GET(req: NextRequest) {
       location: { lat, lng, city: city || getDefaultCity().name },
     },
     {
-      headers: {
-        'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=300',
-      },
+      headers: { 'Cache-Control': 'no-store' },
     }
   );
 }
@@ -234,6 +199,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (!auth?.id || auth.role !== 'owner') {
+      return NextResponse.json({ error: 'Sign in with an owner account to register a shop' }, { status: 401 });
+    }
+
     const body = await req.json();
 
     const name = String(body?.name ?? '').trim();
@@ -247,6 +216,7 @@ export async function POST(req: NextRequest) {
     const phone = String(body?.phone ?? '').trim();
     const website = String(body?.website ?? '').trim();
     const tags = sanitizeStringArray(body?.tags, 30);
+    const keywords = sanitizeStringArray(body?.keywords, 50).map((value) => value.toLowerCase());
     const specialties = sanitizeStringArray(body?.specialties, 30);
     const inputLat = toNumber(body?.lat?.toString?.() ?? null);
     const inputLng = toNumber(body?.lng?.toString?.() ?? null);
@@ -269,35 +239,29 @@ export async function POST(req: NextRequest) {
 
     await connectDb();
 
-    let owner = null as any;
-    if (auth?.id) {
-      owner = await User.findById(auth.id).lean();
-    }
-
-    if (!owner) {
-      const guestEmail = String(body?.ownerEmail ?? body?.email ?? 'guest-owner@locara.local').trim();
-      const guestName = String(body?.ownerName ?? body?.name ?? 'Guest Owner').trim() || 'Guest Owner';
-      const guestImg = body?.ownerImg ? String(body.ownerImg).trim() : undefined;
-
-      owner = await User.findOne({ email: guestEmail }).lean();
-      if (!owner) {
-        owner = await User.create({
-          name: guestName,
-          email: guestEmail,
-          role: 'owner',
-          provider: 'credentials',
-          img: guestImg,
-        });
-      }
+    const owner = await User.findById(auth.id).lean();
+    if (!owner || owner.role !== 'owner') {
+      return NextResponse.json({ error: 'Owner account could not be verified' }, { status: 403 });
     }
 
     const profilePayload = {
       ownerId: owner._id,
-      ownerName: owner.name,
+      ownerName: String(body?.ownerName ?? owner.name).trim(),
       ownerEmail: owner.email,
+      contactEmail: String(body?.email ?? owner.email).trim().toLowerCase(),
       ownerImg: owner.img,
       name,
       category,
+      subcategory: String(body?.subcategory ?? '').trim(),
+      businessType: String(body?.businessType ?? '').trim(),
+      priceRange: String(body?.priceRange ?? '').trim(),
+      yearsInBusiness: Number.isFinite(Number(body?.yearsInBusiness)) ? Math.max(0, Number(body.yearsInBusiness)) : undefined,
+      targetAudience: String(body?.targetAudience ?? '').trim(),
+      productsServices: String(body?.productsServices ?? '').trim(),
+      area: String(body?.area ?? '').trim(),
+      pincode: String(body?.pincode ?? '').trim(),
+      shopStyle: String(body?.shopStyle ?? '').trim(),
+      aiGeneratedDescription: String(body?.aiGeneratedDescription ?? '').trim(),
       description,
       address,
       city,
@@ -306,6 +270,7 @@ export async function POST(req: NextRequest) {
       phone,
       website,
       tags,
+      keywords,
       specialties,
       tagline: body?.tagline ? String(body.tagline).trim() : undefined,
       est: typeof body?.est === 'number' ? body.est : undefined,
@@ -320,6 +285,7 @@ export async function POST(req: NextRequest) {
         type: 'Point',
         coordinates: [coords.lng, coords.lat],
       },
+      status: 'APPROVED',
     };
 
     let created = false;

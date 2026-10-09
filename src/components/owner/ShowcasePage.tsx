@@ -1,284 +1,295 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/store/useStore';
 import {
   Users,
-  CalendarCheck,
-  TrendingUp,
+  ShoppingBag,
   IndianRupee,
-  Plus,
-  Sparkles,
-  Tag,
-  QrCode,
-  ArrowRight,
-  Store,
   CheckCircle2,
+  Plus,
+  QrCode,
+  Store,
+  ChevronRight,
+  TrendingUp,
   Clock,
-  Eye,
+  ArrowUpRight,
 } from 'lucide-react';
-import PremiumButton from '@/components/ui/PremiumButton';
 import VerifyPickupModal from './VerifyPickupModal';
 
 export default function ShowcasePage() {
   const router = useRouter();
-  const { user, ownerShopId, ownerShopName, ownerNavTo, shopProducts } = useStore();
-  const [metrics, setMetrics] = useState({
-    footfall: 42,
-    reservations: 8,
-    expectedVisits: 12,
-    expectedRevenue: 18400,
-    followers: 24,
+  const { ownerShopId, ownerShopName, ownerNavTo, reservations, shopProfiles, updateShopProfile, showToast } = useStore();
+  const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
+  const isOpenToggle = shopProfiles[ownerShopId]?.isOpen ?? true;
+
+  // Mocked/Live recent reservations matching the mockup
+  const shopReservations = reservations.filter((reservation) => reservation.shopId === ownerShopId);
+  const recentReservations = shopReservations.slice(0, 4).map((reservation) => {
+    const completed = reservation.status === 'COMPLETED';
+    const cancelled = reservation.status === 'CANCELLED';
+    return {
+      id: reservation.otp,
+      customer: reservation.customerName,
+      items: 1,
+      pickupTime: reservation.timeSlot,
+      status: completed ? 'Picked Up' : cancelled ? 'Cancelled' : 'Reserved',
+      statusColor: completed ? 'bg-[#EFF6FF] text-[#2563EB]' : cancelled ? 'bg-[#FEE2E2] text-[#B91C1C]' : 'bg-[#FEF3C7] text-[#D97706]',
+      total: reservation.price,
+    };
   });
-  const [activeReservations, setActiveReservations] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [verifyingRes, setVerifyingRes] = useState<any | null>(null);
-
-  const products = shopProducts[ownerShopId] || [];
-
-  const loadDashboardData = useCallback(async () => {
+  const activeCount = shopReservations.filter((reservation) => reservation.status === 'CONFIRMED' || reservation.status === 'VISITED').length;
+  const completedCount = shopReservations.filter((reservation) => reservation.status === 'COMPLETED').length;
+  const revenue = shopReservations.filter((reservation) => reservation.status !== 'CANCELLED').reduce((sum, reservation) => sum + reservation.price, 0);
+  const todayKey = new Date().toDateString();
+  const todayReservations = shopReservations.filter((reservation) => new Date(reservation.createdAt).toDateString() === todayKey && reservation.status !== 'CANCELLED');
+  const todayRevenue = todayReservations.reduce((sum, reservation) => sum + reservation.price, 0);
+  const salesHours = [9, 12, 15, 18, 21];
+  const salesByHour = salesHours.map((hour) => todayReservations
+    .filter((reservation) => new Date(reservation.createdAt).getHours() >= hour && new Date(reservation.createdAt).getHours() < hour + 3)
+    .reduce((sum, reservation) => sum + reservation.price, 0));
+  const maxSalesHour = Math.max(...salesByHour, 1);
+  const formatMoney = (amount: number) => `₹${amount.toLocaleString('en-IN')}`;
+  const toggleStoreStatus = async () => {
+    const isOpen = !isOpenToggle;
+    updateShopProfile(ownerShopId, { isOpen });
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
     try {
-      const token = localStorage.getItem('auth_token') || '';
-      const [funnelRes, resRes] = await Promise.all([
-        fetch(`/api/analytics/funnel?shopId=${ownerShopId}&range=today`),
-        fetch(`/api/reservations?shopId=${ownerShopId}&status=CONFIRMED`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        }),
-      ]);
-
-      if (funnelRes.ok) {
-        const fData = await funnelRes.json();
-        if (fData.metrics) {
-          setMetrics({
-            footfall: fData.metrics.footfall || 42,
-            reservations: fData.metrics.reservations || 8,
-            expectedVisits: fData.metrics.expectedVisits || 12,
-            expectedRevenue: fData.metrics.expectedRevenue || 18400,
-            followers: fData.metrics.followersGained || 24,
-          });
-        }
-      }
-
-      if (resRes.ok) {
-        const rData = await resRes.json();
-        setActiveReservations(rData.reservations || []);
-      }
-    } catch {} finally {
-      setLoading(false);
+      const response = await fetch('/api/owner/shop', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ isOpen }),
+      });
+      if (!response.ok) throw new Error('Could not save store status');
+    } catch {
+      updateShopProfile(ownerShopId, { isOpen: !isOpen });
+      showToast('Store status could not be saved. Please try again.');
     }
-  }, [ownerShopId]);
-
-  useEffect(() => {
-    void loadDashboardData();
-  }, [loadDashboardData]);
+  };
 
   return (
-    <div className="space-y-8 pb-16">
-      {/* Top Greeting Header */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-[#17120E] border border-[#F6EAD7]/10 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+    <div className="space-y-6 pb-16">
+      {/* ── 1. Top Bar / Header ────────────────────────────── */}
+      <div className="bg-white border border-[#E5E5E5] rounded-xl p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <Store className="w-4 h-4 text-[#2D7D64]" />
-            <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#2D7D64]">
-              STOREFRONT OVERVIEW • TODAY
+          <h1 className="text-xl sm:text-2xl font-extrabold text-[#171717]">
+            Dashboard
+          </h1>
+          <p className="text-xs text-[#666666] mt-0.5">
+            Managing <strong className="text-[#171717]">{ownerShopName}</strong> • Real-time in-store pickup operations
+          </p>
+        </div>
+
+        {/* Store Open/Closed Toggle */}
+        <div className="flex items-center gap-3 bg-[#F5F4F0] p-1.5 px-3 rounded-lg border border-[#E5E5E5]">
+          <span className="text-xs font-bold text-[#171717]">Store Status:</span>
+          <button
+            type="button"
+            onClick={toggleStoreStatus}
+            className={`px-3 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
+              isOpenToggle
+                ? 'bg-[#16803C] text-white shadow-sm'
+                : 'bg-[#DC2626] text-white shadow-sm'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+            <span>{isOpenToggle ? 'Open' : 'Closed'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── 2. 4 Stat Metric Cards (Mockup Screen 7) ────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Metric 1 */}
+        <div className="bg-white border border-[#E5E5E5] rounded-xl p-4 sm:p-5 shadow-sm space-y-1">
+          <span className="text-xs font-medium text-[#666666] block">Shop Reservations</span>
+          <div className="flex items-baseline justify-between">
+            <span className="text-2xl sm:text-3xl font-black text-[#171717]">{shopReservations.length}</span>
+            <span className="text-[10px] font-bold text-[#666666] bg-[#F5F4F0] px-1.5 py-0.5 rounded">All time</span>
+          </div>
+        </div>
+
+        {/* Metric 2 */}
+        <div className="bg-white border border-[#E5E5E5] rounded-xl p-4 sm:p-5 shadow-sm space-y-1">
+          <span className="text-xs font-medium text-[#666666] block">Reserved Drops</span>
+          <div className="flex items-baseline justify-between">
+            <span className="text-2xl sm:text-3xl font-black text-[#171717]">{activeCount}</span>
+            <span className="text-[10px] font-bold text-[#A85420] bg-[#FBF3EE] px-1.5 py-0.5 rounded">
+              Active
             </span>
           </div>
-          <h1 className="font-serif text-2xl sm:text-4xl font-bold text-[#F6EAD7]">
-            Good Morning, {user?.name || 'Partner'}
-          </h1>
-          <p className="text-xs text-[#9E8B75] mt-1">
-            Managing <strong className="text-[#F6EAD7]">{ownerShopName}</strong> • Real-time footfall and in-store reservations.
-          </p>
         </div>
 
-        {/* Quick QR Pickup Trigger */}
-        <button
-          type="button"
-          onClick={() => setVerifyingRes({ direct: true })}
-          className="px-5 py-3 rounded-2xl bg-[#C8893F] hover:bg-[#E0AF62] text-xs font-bold text-[#0E0B08] flex items-center gap-2 shadow-glow-sm cursor-pointer shrink-0"
-        >
-          <QrCode className="w-4 h-4" />
-          <span>Verify Customer Pickup</span>
-        </button>
-      </div>
-
-      {/* 5 Key Metrics Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
-        {/* Footfall */}
-        <div className="p-5 rounded-3xl bg-[#17120E] border border-[#F6EAD7]/10 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-mono uppercase font-bold text-[#9E8B75]">Today&apos;s Footfall</span>
-            <Users className="w-4 h-4 text-[#2D7D64]" />
+        {/* Metric 3 */}
+        <div className="bg-white border border-[#E5E5E5] rounded-xl p-4 sm:p-5 shadow-sm space-y-1">
+          <span className="text-xs font-medium text-[#666666] block">Total Revenue</span>
+          <div className="flex items-baseline justify-between">
+            <span className="text-2xl sm:text-3xl font-black text-[#171717]">{formatMoney(revenue)}</span>
+            <span className="text-[10px] font-bold text-[#666666] bg-[#F5F4F0] px-1.5 py-0.5 rounded">All time</span>
           </div>
-          <p className="font-serif text-3xl font-bold text-[#F6EAD7]">{metrics.footfall}</p>
-          <span className="text-[10px] text-[#2D7D64] mt-1 inline-block font-semibold">Verified Store Visits</span>
         </div>
 
-        {/* Active Reservations */}
-        <div className="p-5 rounded-3xl bg-[#17120E] border border-[#F6EAD7]/10 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-mono uppercase font-bold text-[#9E8B75]">Reservations</span>
-            <CalendarCheck className="w-4 h-4 text-[#C8893F]" />
+        {/* Metric 4 */}
+        <div className="bg-white border border-[#E5E5E5] rounded-xl p-4 sm:p-5 shadow-sm space-y-1">
+          <span className="text-xs font-medium text-[#666666] block">Verified Pickups</span>
+          <div className="flex items-baseline justify-between">
+            <span className="text-2xl sm:text-3xl font-black text-[#171717]">{completedCount}</span>
+            <span className="text-[10px] font-bold text-[#2563EB] bg-[#EFF6FF] px-1.5 py-0.5 rounded">
+              Completed
+            </span>
           </div>
-          <p className="font-serif text-3xl font-bold text-[#E0AF62]">{metrics.reservations}</p>
-          <span className="text-[10px] text-[#9E8B75] mt-1 inline-block">10% Advance Secured</span>
-        </div>
-
-        {/* Expected Visits */}
-        <div className="p-5 rounded-3xl bg-[#17120E] border border-[#F6EAD7]/10 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-mono uppercase font-bold text-[#9E8B75]">Expected Visits</span>
-            <Clock className="w-4 h-4 text-[#3b82f6]" />
-          </div>
-          <p className="font-serif text-3xl font-bold text-[#F6EAD7]">{metrics.expectedVisits}</p>
-          <span className="text-[10px] text-[#9E8B75] mt-1 inline-block">Navigating Currently</span>
-        </div>
-
-        {/* Expected Revenue */}
-        <div className="p-5 rounded-3xl bg-[#17120E] border border-[#F6EAD7]/10 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-mono uppercase font-bold text-[#9E8B75]">Expected Revenue</span>
-            <IndianRupee className="w-4 h-4 text-[#E0AF62]" />
-          </div>
-          <p className="font-mono text-2xl sm:text-3xl font-bold text-[#E0AF62]">
-            ₹{metrics.expectedRevenue.toLocaleString('en-IN')}
-          </p>
-          <span className="text-[10px] text-[#2D7D64] mt-1 inline-block">In-Store Balance Due</span>
-        </div>
-
-        {/* New Followers */}
-        <div className="p-5 rounded-3xl bg-[#17120E] border border-[#F6EAD7]/10 shadow-sm col-span-2 lg:col-span-1">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-mono uppercase font-bold text-[#9E8B75]">New Followers</span>
-            <Sparkles className="w-4 h-4 text-[#C8893F]" />
-          </div>
-          <p className="font-serif text-3xl font-bold text-[#F6EAD7]">+{metrics.followers}</p>
-          <span className="text-[10px] text-[#9E8B75] mt-1 inline-block">Customer Audience</span>
         </div>
       </div>
 
-      {/* Quick Actions Ribbon */}
-      <div>
-        <h3 className="font-serif font-bold text-lg text-[#F6EAD7] mb-3">Storefront Operations</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <button
-            type="button"
-            onClick={() => ownerNavTo('addproduct')}
-            className="p-4 rounded-2xl bg-[#17120E] hover:bg-[#211A14] border border-[#F6EAD7]/10 flex flex-col items-center justify-center text-center gap-2 transition-all cursor-pointer shadow-sm group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-[#211A14] flex items-center justify-center text-[#C8893F] group-hover:scale-110 transition-transform">
-              <Plus className="w-5 h-5" />
-            </div>
-            <span className="text-xs font-bold text-[#F6EAD7]">Add Product</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => ownerNavTo('collections')}
-            className="p-4 rounded-2xl bg-[#17120E] hover:bg-[#211A14] border border-[#F6EAD7]/10 flex flex-col items-center justify-center text-center gap-2 transition-all cursor-pointer shadow-sm group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-[#211A14] flex items-center justify-center text-[#E0AF62] group-hover:scale-110 transition-transform">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <span className="text-xs font-bold text-[#F6EAD7]">Create Collection</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => ownerNavTo('reservations')}
-            className="p-4 rounded-2xl bg-[#17120E] hover:bg-[#211A14] border border-[#F6EAD7]/10 flex flex-col items-center justify-center text-center gap-2 transition-all cursor-pointer shadow-sm group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-[#211A14] flex items-center justify-center text-[#2D7D64] group-hover:scale-110 transition-transform">
-              <CalendarCheck className="w-5 h-5" />
-            </div>
-            <span className="text-xs font-bold text-[#F6EAD7]">View Reservations</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => ownerNavTo('analytics')}
-            className="p-4 rounded-2xl bg-[#17120E] hover:bg-[#211A14] border border-[#F6EAD7]/10 flex flex-col items-center justify-center text-center gap-2 transition-all cursor-pointer shadow-sm group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-[#211A14] flex items-center justify-center text-[#3b82f6] group-hover:scale-110 transition-transform">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-            <span className="text-xs font-bold text-[#F6EAD7]">Analytics Funnel</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Active Reservations Awaiting Customer Arrival */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
+      {/* ── 3. Recent Reservations Table ────────────────────── */}
+      <div className="bg-white border border-[#E5E5E5] rounded-xl overflow-hidden shadow-sm">
+        <div className="px-5 py-4 border-b border-[#E5E5E5] flex items-center justify-between">
           <div>
-            <h3 className="font-serif font-bold text-lg text-[#F6EAD7]">
-              Active Reservations Awaiting Pickup ({activeReservations.length})
-            </h3>
-            <p className="text-xs text-[#9E8B75]">
-              Customers who have locked inventory with a 10% advance deposit.
-            </p>
+            <h3 className="font-bold text-base text-[#171717]">Recent Reservations</h3>
+            <p className="text-xs text-[#666666]">Customer orders waiting for in-store collection</p>
           </div>
 
           <button
             type="button"
             onClick={() => ownerNavTo('reservations')}
-            className="text-xs font-bold text-[#E0AF62] hover:underline"
+            className="text-xs font-bold text-[#A85420] hover:text-[#873F17] flex items-center gap-1"
           >
-            Manage All →
+            <span>View All</span>
+            <ChevronRight className="w-4 h-4" />
           </button>
         </div>
 
-        {activeReservations.length === 0 ? (
-          <div className="p-10 rounded-3xl bg-[#17120E] border border-[#F6EAD7]/10 text-center">
-            <p className="text-xs text-[#9E8B75]">No active pickup reservations pending at this moment.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {activeReservations.slice(0, 4).map((r, i) => {
-              const item = r.items?.[0] || {};
-              return (
-                <div
-                  key={r.id || r.reservationNumber || i}
-                  className="p-4 sm:p-5 rounded-2xl bg-[#17120E] border border-[#F6EAD7]/10 flex items-center justify-between gap-4"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-[#E0AF62]">
-                        {r.reservationNumber}
-                      </span>
-                      <span className="text-xs text-[#F6EAD7] font-semibold">{r.userName}</span>
-                    </div>
-                    <p className="text-xs text-[#9E8B75] truncate mt-0.5">{item.name || 'Artisanal Product'}</p>
-                    <p className="text-[11px] font-mono text-[#2D7D64] mt-1">
-                      Collect In-Store: ₹{r.remainingAmount} (10% advance paid)
-                    </p>
-                  </div>
+        {/* Table for Desktop */}
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-[#FAFAF8] border-b border-[#E5E5E5] text-[#666666] font-semibold">
+              <tr>
+                <th className="px-5 py-3">Customer</th>
+                <th className="px-5 py-3">Items</th>
+                <th className="px-5 py-3">Pickup Time</th>
+                <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#E5E5E5] text-[#171717]">
+              {recentReservations.length === 0 && (
+                <tr><td colSpan={5} className="px-5 py-10 text-center text-xs text-[#666666]">No reservations for this shop yet.</td></tr>
+              )}
+              {recentReservations.map((res) => (
+                <tr key={res.id} className="hover:bg-[#FAFAF8] transition-colors">
+                  <td className="px-5 py-3.5">
+                    <span className="font-bold block">{res.customer}</span>
+                    <span className="text-[10px] text-[#8A8A8A] font-mono">{res.id}</span>
+                  </td>
+                  <td className="px-5 py-3.5 font-medium">{res.items} items</td>
+                  <td className="px-5 py-3.5 font-medium">{res.pickupTime}</td>
+                  <td className="px-5 py-3.5">
+                    <span
+                      className={`px-2.5 py-0.5 rounded text-[10px] font-bold ${res.statusColor}`}
+                    >
+                      {res.status}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5 text-right">
+                    {res.status !== 'Picked Up' && res.status !== 'Cancelled' ? <button
+                      type="button"
+                      onClick={() => setIsVerifyModalOpen(true)}
+                      className="px-3 py-1 bg-[#F5F4F0] hover:bg-[#A85420] hover:text-white text-[#171717] font-semibold text-[11px] rounded transition-colors"
+                    >
+                      Verify
+                    </button> : <span className="text-[10px] text-[#8A8A8A]">Done</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setVerifyingRes(r)}
-                    className="px-4 py-2 rounded-xl bg-[#211A14] hover:bg-[#2A2119] border border-[#F6EAD7]/10 text-xs font-bold text-[#E0AF62] flex items-center gap-1.5 shrink-0 cursor-pointer"
-                  >
-                    <QrCode className="w-3.5 h-3.5" /> Verify
-                  </button>
+        {/* Cards for Mobile */}
+        <div className="sm:hidden divide-y divide-[#E5E5E5] p-3 space-y-3">
+          {recentReservations.map((res) => (
+            <div key={res.id} className="p-3 bg-[#FAFAF8] rounded-lg space-y-2">
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="font-bold text-sm block">{res.customer}</span>
+                  <span className="text-[10px] text-[#8A8A8A] font-mono">{res.id}</span>
                 </div>
-              );
-            })}
-          </div>
-        )}
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${res.statusColor}`}>
+                  {res.status}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs text-[#666666]">
+                <span>{res.items} items</span>
+                <span>Pickup: {res.pickupTime}</span>
+              </div>
+              {res.status !== 'Picked Up' && res.status !== 'Cancelled' && <button
+                type="button"
+                onClick={() => setIsVerifyModalOpen(true)}
+                className="w-full py-1.5 bg-[#A85420] text-white text-xs font-semibold rounded"
+              >
+                Verify Pickup
+              </button>}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Verify Pickup Modal */}
-      {verifyingRes && (
+      {/* ── 4. Bottom Row: Quick Actions & Sales Chart ─────── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Quick Actions Card */}
+        <div className="bg-white border border-[#E5E5E5] rounded-xl p-5 space-y-4 shadow-sm">
+          <h3 className="font-bold text-base text-[#171717]">Quick Actions</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => ownerNavTo('addproduct')}
+              className="py-3 px-4 bg-[#A85420] hover:bg-[#873F17] text-white text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Product</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsVerifyModalOpen(true)}
+              className="py-3 px-4 bg-[#F5F4F0] hover:bg-[#EAE8E2] text-[#171717] border border-[#E5E5E5] text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
+              <QrCode className="w-4 h-4 text-[#A85420]" />
+              <span>Verify Pickup</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Today's Sales Chart Widget */}
+        <div className="bg-white border border-[#E5E5E5] rounded-xl p-5 space-y-3 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-base text-[#171717]">Today&apos;s Sales</h3>
+            <span className="text-sm font-black text-[#171717]">{formatMoney(todayRevenue)}</span>
+          </div>
+
+          {/* Bar Chart Visualization */}
+          <div className="h-28 flex items-end justify-between gap-3 pt-4 px-2">
+            {salesHours.map((hour, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+                <div
+                  className="w-full bg-[#A85420]/80 hover:bg-[#A85420] rounded-t transition-all"
+                  title={formatMoney(salesByHour[i])}
+                  style={{ height: `${Math.max(salesByHour[i] ? 8 : 0, (salesByHour[i] / maxSalesHour) * 100)}%` }}
+                />
+                <span className="text-[10px] font-medium text-[#8A8A8A]">{hour % 12 || 12} {hour < 12 ? 'AM' : 'PM'}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── 5. Verify Pickup Modal ──────────────────────────── */}
+      {isVerifyModalOpen && (
         <VerifyPickupModal
-          isOpen={Boolean(verifyingRes)}
-          onClose={() => {
-            setVerifyingRes(null);
-            void loadDashboardData();
-          }}
-          reservationId={verifyingRes.reservationNumber || verifyingRes.id}
-          onVerified={() => void loadDashboardData()}
+          reservation={null}
+          onClose={() => setIsVerifyModalOpen(false)}
         />
       )}
     </div>

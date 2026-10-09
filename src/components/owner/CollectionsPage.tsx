@@ -34,7 +34,11 @@ export default function CollectionsPage() {
   const fetchCollections = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/collections?shopId=${ownerShopId || ''}`);
+      const token = localStorage.getItem('auth_token') || '';
+      const res = await fetch(`/api/collections?shopId=${ownerShopId || ''}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        cache: 'no-store',
+      });
       if (res.ok) {
         const data = await res.json();
         setCollections(data.collections || []);

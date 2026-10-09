@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDb } from "@/lib/mongodb";
 import { FootfallEvent } from "@/models/Visit";
+import { ShopProfile } from "@/models/ShopProfile";
 import { extractBearerToken, verifyAuthToken } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
     const token = extractBearerToken(req);
     let userId: string | undefined = undefined;
+    let ownerId: string | undefined;
     if (token) {
       try {
         const auth = verifyAuthToken(token);
         userId = auth.id;
+        if (auth.role === "owner") ownerId = auth.id;
       } catch {}
     }
 
@@ -23,9 +26,16 @@ export async function POST(req: NextRequest) {
 
     await connectDb();
 
+    if (ownerId) {
+      const ownerShop = await ShopProfile.findOne({ ownerId }).select({ shopId: 1 }).lean();
+      if (!ownerShop || ownerShop.shopId !== String(shopId)) {
+        return NextResponse.json({ error: "Owners can only log activity for their own shop" }, { status: 403 });
+      }
+    }
+
     const event = await FootfallEvent.create({
       shopId,
-      userId: body.userId || userId,
+      userId,
       reservationId,
       eventType,
       verificationMethod,
