@@ -55,19 +55,15 @@ export default function LeafletShopMap({
         attributionControl: false,
       });
 
-      // CARTO's public basemap key is a client-side key; restrict it to your site in CARTO.
-      const cartoKey = process.env.NEXT_PUBLIC_CARTO_API_KEY;
-      const cartoKeyParam = cartoKey ? `?key=${encodeURIComponent(cartoKey)}` : '';
-      L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png${cartoKeyParam}`, {
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        subdomains: 'abcd',
       }).addTo(map);
 
       // Attribution
       L.control
         .attribution({
           position: 'bottomright',
-          prefix: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          prefix: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         })
         .addTo(map);
 
