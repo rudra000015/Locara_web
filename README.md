@@ -221,15 +221,7 @@ pnpm lint     # Run ESLint
 - API response caching
 - LocalStorage for session persistence
 
-## License
 
-MIT License - feel free to use this project for your own purposes
-
-## Support
-
-For issues and questions:
-- GitHub Issues: [Report a bug](https://github.com/YOUR_USERNAME/locara/issues)
-- Email: support@locara.app
 
 ## Contributing
 
